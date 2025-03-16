@@ -21,7 +21,7 @@ router.get('/experience', async (req, res) => {
     const [experiences] = await db.query('SELECT * FROM experiencess');
     res.json(experiences);
   } catch (error) {
-    res.status(500).json({ message: 'Sunucu hatası', error });
+    res.status(500).json({ message: 'Sunucu hatası' + error });
   }
 });
 
