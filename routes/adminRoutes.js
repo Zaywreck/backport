@@ -22,6 +22,7 @@ router.get('/experience', async (req, res) => {
     res.json(experiences);
   } catch (error) {
     res.status(500).json({ message: 'Sunucu hatası' + error });
+    console.log(error);
   }
 });
 
