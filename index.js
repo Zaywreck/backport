@@ -13,7 +13,7 @@ app.use((req, res, next) => {
 
 // CORS middleware to allow cross-origin requests 
 app.use(
-  cors("http://localhost:5173")
+  cors("88.231.66.159")
 );
 
 // JSON verileri almak için middleware
