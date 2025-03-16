@@ -78,7 +78,8 @@ router.get('/education', async (req, res) => {
     const [education] = await db.query('SELECT * FROM educationn');
     res.json(education);
   } catch (error) {
-    res.status(500).json({ message: 'Sunucu hatası' });
+    res.status(500).json({ message: 'Sunucu hatası' + error });
+    console.log(error);
   }
 });
 
