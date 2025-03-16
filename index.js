@@ -5,15 +5,9 @@ const adminRoutes = require('./routes/adminRoutes');
 
 const app = express();
 
-// Genel middleware örneği
-app.use((req, res, next) => {
-  console.log('Middleware çalıştı');
-  next();
-});
-
 // CORS middleware to allow cross-origin requests 
 app.use(
-  cors("88.231.66.159")
+  cors()
 );
 
 // JSON verileri almak için middleware
