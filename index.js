@@ -16,7 +16,10 @@ app.use(cors());
 
 // JSON verileri almak için middleware
 app.use(express.json());
-
+// welcome route
+app.get('/', (req, res) => {
+  res.send('Welcome to the API');
+});
 // Routes
 app.use('/api/auth', authRoutes); // auth rotalarını '/auth' ile ilişkilendiriyoruz
 app.use('/api/admin', adminRoutes);  // Admin API'lerini buraya yönlendir
