@@ -2,6 +2,8 @@ const express = require("express");
 const db = require("../db"); // Veritabanı bağlantısı
 
 const router = express.Router();
+router.use(cors());
+
 
 // Kullanıcı Girişi
 router.post("/login", async (req, res) => {

@@ -7,11 +7,7 @@ const app = express();
 
 // CORS middleware to allow cross-origin requests 
 // add preflight request for login
-app.use(cors({
-  origin: "http://localhost:5173", // Allow requests from your frontend
-  methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
-  credentials: true // Allow cookies & authentication headers
-}));
+app.use(cors());
 
 
 // JSON verileri almak için middleware
