@@ -11,8 +11,10 @@ app.use((req, res, next) => {
   next();
 });
 
-// CORS middleware
-app.use(cors());
+// CORS middleware to allow cross-origin requests 
+app.use(
+  cors("http://localhost:5173")
+);
 
 // JSON verileri almak için middleware
 app.use(express.json());
