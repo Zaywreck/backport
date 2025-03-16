@@ -7,9 +7,11 @@ const app = express();
 
 // CORS middleware to allow cross-origin requests 
 // add preflight request for login
-app.use(cors());
-
-
+app.use(function(req, res, next) {
+  res.header("Access-Control-Allow-Origin", "http:88.231.66.159"); // update to match the domain you will make the request from
+  res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
+  next();
+});
 // JSON verileri almak için middleware
 app.use(express.json());
 // welcome route
