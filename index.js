@@ -6,9 +6,13 @@ const adminRoutes = require('./routes/adminRoutes');
 const app = express();
 
 // CORS middleware to allow cross-origin requests 
-app.use(
-  cors()
-);
+// add preflight request for login
+app.use(cors({
+  origin: "http://localhost:5173", // Allow requests from your frontend
+  methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
+  credentials: true // Allow cookies & authentication headers
+}));
+
 
 // JSON verileri almak için middleware
 app.use(express.json());
