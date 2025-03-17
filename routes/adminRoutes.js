@@ -77,11 +77,9 @@ router.post('/education', async (req, res) => {
   const { school, degree, field, startDate, endDate, description } = req.body;
 
   try {
-    let education = (await get('education')) || [];
-    const newId = education.length > 0 ? Math.max(...education.map(edu => edu.id)) + 1 : 1;
-
+    const education = (await get('education')) || [];
     const newEducation = {
-      id: newId,
+      id: education.length + 1,
       school,
       degree,
       field,
@@ -90,12 +88,13 @@ router.post('/education', async (req, res) => {
       description,
     };
 
-    education.push(newEducation);
-    await set('education', education);
+    // Güncelleme işlemi
+    const updatedEducation = [...education, newEducation];
+    await set('education', updatedEducation);  // Burada 'set' kullanımı doğru olmalı
 
     res.status(201).json(newEducation);
   } catch (error) {
-    res.status(500).json({ message: 'Sunucu hatası: ' + error.message });
+    res.status(500).json({ message: 'Sunucu hatası: ' + error });
   }
 });
 
