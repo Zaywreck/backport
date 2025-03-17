@@ -1,22 +1,22 @@
 const express = require('express');
 const cors = require('cors');
-const authRoutes = require('./routes/auth');
 const adminRoutes = require('./routes/adminRoutes');
 
 const app = express();
 
-// CORS middleware to allow cross-origin requests 
+// CORS middleware
 app.use(cors());
 
 // JSON verileri almak için middleware
 app.use(express.json());
-// welcome route
+
+// Welcome route
 app.get('/', (req, res) => {
-  res.send('Welcome to the API');
+  res.send('Welcome to the API powered by Vercel Edge Config 🚀');
 });
+
 // Routes
-// app.use('/api/auth', authRoutes); // auth rotalarını '/auth' ile ilişkilendiriyoruz
-app.use('/api/admin', adminRoutes);  // Admin API'lerini buraya yönlendir
+app.use('/api/admin', adminRoutes);
 
 // Sunucu başlatma
 const PORT = 3169;
