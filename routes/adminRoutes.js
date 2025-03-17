@@ -11,7 +11,7 @@ router.get('/experience', async (req, res) => {
     const experiences = (await get('experiences')) || [];
     res.json(experiences);
   } catch (error) {
-    res.status(500).json({ message: 'Sunucu hatası: ' + error });
+    res.status(500).json({ message: 'Sunucu hatası: ' + error.message });
   }
 });
 
@@ -20,9 +20,11 @@ router.post('/experience', async (req, res) => {
   const { title, company, startDate, endDate, description } = req.body;
 
   try {
-    const experiences = (await get('experiences')) || [];
+    let experiences = (await get('experiences')) || [];
+    const newId = experiences.length > 0 ? Math.max(...experiences.map(exp => exp.id)) + 1 : 1;
+
     const newExperience = {
-      id: experiences.length + 1,
+      id: newId,
       title,
       company,
       startDate,
@@ -30,12 +32,12 @@ router.post('/experience', async (req, res) => {
       description,
     };
 
-    const updatedExperiences = [...experiences, newExperience];
-    await set('experiences', updatedExperiences);
+    experiences.push(newExperience);
+    await set('experiences', experiences);
 
     res.status(201).json(newExperience);
   } catch (error) {
-    res.status(500).json({ message: 'Sunucu hatası: ' + error });
+    res.status(500).json({ message: 'Sunucu hatası: ' + error.message });
   }
 });
 
@@ -45,12 +47,16 @@ router.delete('/experience/:id', async (req, res) => {
 
   try {
     let experiences = (await get('experiences')) || [];
-    experiences = experiences.filter(exp => exp.id !== Number(id));
+    const filteredExperiences = experiences.filter(exp => exp.id !== Number(id));
 
-    await set('experiences', experiences);
+    if (filteredExperiences.length === experiences.length) {
+      return res.status(404).json({ message: 'Deneyim bulunamadı' });
+    }
+
+    await set('experiences', filteredExperiences);
     res.status(200).json({ message: 'Deneyim bilgisi silindi' });
   } catch (error) {
-    res.status(500).json({ message: 'Sunucu hatası: ' + error });
+    res.status(500).json({ message: 'Sunucu hatası: ' + error.message });
   }
 });
 
@@ -62,7 +68,7 @@ router.get('/education', async (req, res) => {
     const education = (await get('education')) || [];
     res.json(education);
   } catch (error) {
-    res.status(500).json({ message: 'Sunucu hatası: ' + error });
+    res.status(500).json({ message: 'Sunucu hatası: ' + error.message });
   }
 });
 
@@ -71,9 +77,11 @@ router.post('/education', async (req, res) => {
   const { school, degree, field, startDate, endDate, description } = req.body;
 
   try {
-    const education = (await get('education')) || [];
+    let education = (await get('education')) || [];
+    const newId = education.length > 0 ? Math.max(...education.map(edu => edu.id)) + 1 : 1;
+
     const newEducation = {
-      id: education.length + 1,
+      id: newId,
       school,
       degree,
       field,
@@ -82,31 +90,33 @@ router.post('/education', async (req, res) => {
       description,
     };
 
-    const updatedEducation = [...education, newEducation];
-    await set('education', updatedEducation);
+    education.push(newEducation);
+    await set('education', education);
 
     res.status(201).json(newEducation);
   } catch (error) {
-    res.status(500).json({ message: 'Sunucu hatası: ' + error });
+    res.status(500).json({ message: 'Sunucu hatası: ' + error.message });
   }
 });
 
 // Education Bilgisi Silme
-
 router.delete('/education/:id', async (req, res) => {
   const { id } = req.params;
 
   try {
     let education = (await get('education')) || [];
-    education = education.filter(edu => edu.id !== Number(id));
+    const filteredEducation = education.filter(edu => edu.id !== Number(id));
 
-    await set('education', education);
+    if (filteredEducation.length === education.length) {
+      return res.status(404).json({ message: 'Eğitim bulunamadı' });
+    }
+
+    await set('education', filteredEducation);
     res.status(200).json({ message: 'Eğitim bilgisi silindi' });
   } catch (error) {
-    res.status(500).json({ message: 'Sunucu hatası: ' + error });
+    res.status(500).json({ message: 'Sunucu hatası: ' + error.message });
   }
-}
-);
+});
 
 // ===================== Projects =====================
 
@@ -116,7 +126,7 @@ router.get('/projects', async (req, res) => {
     const projects = (await get('projects')) || [];
     res.json(projects);
   } catch (error) {
-    res.status(500).json({ message: 'Sunucu hatası: ' + error });
+    res.status(500).json({ message: 'Sunucu hatası: ' + error.message });
   }
 });
 
@@ -125,39 +135,43 @@ router.post('/projects', async (req, res) => {
   const { title, description, imageUrl, projectUrl } = req.body;
 
   try {
-    const projects = (await get('projects')) || [];
+    let projects = (await get('projects')) || [];
+    const newId = projects.length > 0 ? Math.max(...projects.map(proj => proj.id)) + 1 : 1;
+
     const newProject = {
-      id: projects.length + 1,
+      id: newId,
       title,
       description,
       imageUrl,
       projectUrl,
     };
 
-    const updatedProjects = [...projects, newProject];
-    await set('projects', updatedProjects);
+    projects.push(newProject);
+    await set('projects', projects);
 
     res.status(201).json(newProject);
   } catch (error) {
-    res.status(500).json({ message: 'Sunucu hatası: ' + error });
+    res.status(500).json({ message: 'Sunucu hatası: ' + error.message });
   }
 });
 
 // Project Bilgisi Silme
-
 router.delete('/projects/:id', async (req, res) => {
   const { id } = req.params;
 
   try {
     let projects = (await get('projects')) || [];
-    projects = projects.filter(proj => proj.id !== Number(id));
+    const filteredProjects = projects.filter(proj => proj.id !== Number(id));
 
-    await set('projects', projects);
+    if (filteredProjects.length === projects.length) {
+      return res.status(404).json({ message: 'Proje bulunamadı' });
+    }
+
+    await set('projects', filteredProjects);
     res.status(200).json({ message: 'Proje silindi' });
   } catch (error) {
-    res.status(500).json({ message: 'Sunucu hatası: ' + error });
+    res.status(500).json({ message: 'Sunucu hatası: ' + error.message });
   }
-}
-);
+});
 
 module.exports = router;
