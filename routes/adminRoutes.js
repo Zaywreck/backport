@@ -72,12 +72,15 @@ router.get('/education', async (req, res) => {
   }
 });
 
-// Yeni Education Bilgisi Ekle
+
 router.post('/education', async (req, res) => {
   const { school, degree, field, startDate, endDate, description } = req.body;
 
   try {
+    // Eğitim bilgilerini alıyoruz
     const education = (await get('education')) || [];
+
+    // Yeni eğitim bilgisi
     const newEducation = {
       id: education.length + 1,
       school,
@@ -88,15 +91,20 @@ router.post('/education', async (req, res) => {
       description,
     };
 
-    // Güncelleme işlemi
+    // Eğitim verisini güncelleme
     const updatedEducation = [...education, newEducation];
-    await set('education', updatedEducation);  // Burada 'set' kullanımı doğru olmalı
+    
+    // Yeni veriyi kaydediyoruz
+    await set('education', updatedEducation);
 
+    // Başarıyla eklenen eğitim bilgisini döndürüyoruz
     res.status(201).json(newEducation);
   } catch (error) {
-    res.status(500).json({ message: 'Sunucu hatası: ' + error });
+    console.error(error);
+    res.status(500).json({ message: 'Sunucu hatası: ' + error.message });
   }
 });
+
 
 // Education Bilgisi Silme
 router.delete('/education/:id', async (req, res) => {
