@@ -62,7 +62,7 @@ router.delete('/experience/:id', async (req, res) => {
 
 async function updateExperience(id, updatedData) {
   const experiences = await get('experiences') || [];
-  const index = experiences.findIndex(exp => exp.id === id);
+  const index = experiences.findIndex(exp => exp.id === Number(id)); // Ensure id is compared as a number
 
   if (index === -1) {
     throw new Error('Deneyim bulunamadı');
@@ -71,6 +71,7 @@ async function updateExperience(id, updatedData) {
   experiences[index] = { ...experiences[index], ...updatedData };
   await set('experiences', experiences);
 }
+
 
 router.put('/experience/:id', async (req, res) => {
   const { id } = req.params;
