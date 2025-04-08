@@ -3,8 +3,8 @@ const { get } = require('@vercel/edge-config');
 
 const router = express.Router();
 
-const EDGE_CONFIG_URL = 'https://api.vercel.com/v1/edge-config/ecfg_r5ttjeq5fpdwcyl7muoowf83nad1/items';
-const API_TOKEN = 'Bearer 58W6mvFK9bVdAHyxRzAr0Aql';
+const EDGE_CONFIG_URL = process.env.EDGE_CONFIG_URL;
+const API_TOKEN = process.env.VERCEL_API_TOKEN;
 
 // Helper function to update Edge Config
 async function patchEdgeConfig(key, value) {
