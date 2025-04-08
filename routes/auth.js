@@ -20,7 +20,7 @@ router.post('/login', async (req, res) => {
   }
 
   try {
-    const user = await getUserByEmail(email);
+    const user = await getUser();
 
     if (!user || user.password !== password) {
       return res.status(401).json({ message: 'Geçersiz e-posta veya şifre' });
