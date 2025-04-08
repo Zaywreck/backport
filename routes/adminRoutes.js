@@ -62,19 +62,19 @@ router.delete('/experience/:id', async (req, res) => {
 
 async function updateExperience(id, updatedData) {
   try {
-    // Fetch current experiences from Vercel Edge Config
-    const experiences = await get('experiences') || [];
+    // Fetch current experiences from Vercel Edge Config and parse the JSON string
+    const experiencesJson = await get('experiences');
+    const experiences = experiencesJson ? JSON.parse(experiencesJson) : [];
 
     // Find the experience index by matching the ID
-    const index = id - 1; // Arrays are zero-indexed, so subtract 1
+    const index = experiences.findIndex(experience => experience.id === id.toString());
 
-    if (index < 0 || index >= experiences.length) {
+    if (index === -1) {
       throw new Error('Experience not found');
     }
 
     // Update the experience at the specified index with the new data
     experiences[index] = { ...experiences[index], ...updatedData };
-    console.log(experiences)
 
     // Now update Edge Config using Vercel API (PATCH)
     const response = await fetch(
@@ -107,6 +107,7 @@ async function updateExperience(id, updatedData) {
     throw new Error('Failed to update experience');
   }
 }
+
 
 // PUT endpoint to update an experience
 router.put('/experience/:id', async (req, res) => {
