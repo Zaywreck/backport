@@ -37,6 +37,96 @@ async function patchEdgeConfig(key, value) {
     throw error;
   }
 }
+// ===================== Blogs =====================
+// Blogları Listele
+router.get('/blogs', async (req, res) => {
+  try {
+    const blogs = (await get('blogs')) || [];
+    res.json(blogs);
+  } catch (error) {
+    res.status(500).json({ message: 'Sunucu hatası: ' + error.message });
+  }
+});
+
+// Yeni Blog Ekle
+router.post('/blogs', async (req, res) => {
+  const { title, content, date, author } = req.body;
+
+  try {
+    let blogs = (await get('blogs')) || [];
+    const newId = blogs.length > 0 ? Math.max(...blogs.map(blog => Number(blog.id))) + 1 : 1;
+
+    const newBlog = {
+      id: newId.toString(),
+      title,
+      content,
+      date,
+      author,
+    };
+
+    blogs.push(newBlog);
+    await patchEdgeConfig('blogs', blogs);
+
+    res.status(201).json(newBlog);
+  } catch (error) {
+    res.status(500).json({ message: 'Sunucu hatası: ' + error.message });
+  }
+});
+
+// Blog Silme
+router.delete('/blogs/:id', async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    let blogs = (await get('blogs')) || [];
+    const filteredBlogs = blogs.filter(blog => blog.id !== id);
+
+    if (filteredBlogs.length === blogs.length) {
+      return res.status(404).json({ message: 'Blog bulunamadı' });
+    }
+
+    await patchEdgeConfig('blogs', filteredBlogs);
+    res.status(200).json({ message: 'Blog silindi' });
+  } catch (error) {
+    res.status(500).json({ message: 'Sunucu hatası: ' + error.message });
+  }
+});
+
+// Blog Güncelleme
+async function updateBlog(id, updatedData) {
+  try {
+    let blogs = (await get('blogs')) || [];
+    const index = blogs.findIndex(blog => blog.id === id);
+
+    if (index === -1) {
+      throw new Error('Blog not found');
+    }
+
+    blogs[index] = { ...blogs[index], ...updatedData };
+    await patchEdgeConfig('blogs', blogs);
+
+    return blogs[index];
+  } catch (error) {
+    console.error('Error updating blog:', error);
+    throw new Error('Failed to update blog');
+  }
+}
+
+router.put('/blogs/:id', async (req, res) => {
+  const { id } = req.params;
+  const { title, content, date, author } = req.body;
+
+  if (!title || !content || !date || !author) {
+    return res.status(400).json({ message: 'Missing required fields' });
+  }
+
+  try {
+    await updateBlog(id, { title, content, date, author });
+    res.status(200).json({ message: 'Blog güncellendi' });
+  } catch (error) {
+    res.status(500).json({ message: `Sunucu hatası: ${error.message}` });
+  }
+});
 
 // ===================== Experience =====================
 
