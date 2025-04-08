@@ -77,11 +77,11 @@ async function updateExperience(id, updatedData) {
 
     // Now update Edge Config using Vercel API (PATCH)
     const response = await fetch(
-      'https://api.vercel.com/v1/edge-config/your_edge_config_id_here/items',
+      'https://api.vercel.com/v1/edge-config/ecfg_r5ttjeq5fpdwcyl7muoowf83nad1/items',
       {
         method: 'PATCH',
         headers: {
-          Authorization: `Bearer ${your_vercel_api_token_here}`,
+          Authorization: `Bearer 2d78279a-4a5d-4308-898a-89827b2804c1`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
