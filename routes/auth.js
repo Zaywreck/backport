@@ -21,10 +21,12 @@ router.post('/login', async (req, res) => {
     if (!user || user.password !== password) {
       return res.status(401).json({ message: 'Geçersiz e-posta veya şifre' });
     }
-
+    console.log('Giriş yapan kullanıcı:', user.email);
+    console.log('Giriş yapan kullanıcı şfire:', user.password);
     // Başarılı giriş işlemi
     res.status(200).json({ message: 'Giriş başarılı' });
   } catch (error) {
+    console.log('Giriş hatası:', error);
     res.status(500).json({ message: 'Sunucu hatası: ' + error.message });
   }
 });
