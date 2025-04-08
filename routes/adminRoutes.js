@@ -74,6 +74,7 @@ async function updateExperience(id, updatedData) {
 
     // Update the experience at the specified index with the new data
     experiences[index] = { ...experiences[index], ...updatedData };
+    console.log(experiences)
 
     // Now update Edge Config using Vercel API (PATCH)
     const response = await fetch(
