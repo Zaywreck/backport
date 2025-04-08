@@ -62,10 +62,11 @@ router.delete('/experience/:id', async (req, res) => {
 
 async function updateExperience(id, updatedData) {
   const experiences = await get('experiences') || [];
-  console.log(experiences[id])
-  const index = experiences.findIndex(exp => exp.id === Number(id)); // Ensure id is compared as a number
+  console.log(experiences[id-1]); // This will show the experience at index id-1 (since arrays are 0-indexed)
+  
+  const index = id - 1; // Subtract 1 to match the experience index with the id provided.
 
-  if (index === -1) {
+  if (index < 0 || index >= experiences.length) {
     throw new Error('Deneyim bulunamadı');
   }
 
@@ -74,18 +75,14 @@ async function updateExperience(id, updatedData) {
 }
 
 
+
 router.put('/experience/:id', async (req, res) => {
   const { id } = req.params;
   const { title, company, startDate, endDate, description } = req.body;
 
   try {
-    // Call to the updateExperience function (assume it's defined elsewhere)
-    const updateResult = await updateExperience(Number(id), { title, company, startDate, endDate, description });
-
-    // If no experience was updated (e.g., not found), handle that case.
-    if (!updateResult) {
-      return res.status(404).json({ message: 'Deneyim bulunamadı'});
-    }
+    // Call the updateExperience function with the id and updated data
+    await updateExperience(Number(id), { title, company, startDate, endDate, description });
 
     res.status(200).json({ message: 'Deneyim bilgisi güncellendi' });
   } catch (error) {
@@ -93,11 +90,11 @@ router.put('/experience/:id', async (req, res) => {
     console.error('Error details:', error); // Log full error for debugging
     res.status(500).json({
       message: `Sunucu hatası: ${error.message}`,
-      // Optional: You can log the request body for further debugging if needed
       requestBody: req.body,
     });
   }
 });
+
 
 // ===================== Education =====================
 
