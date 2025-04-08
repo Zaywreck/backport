@@ -7,7 +7,7 @@ const EDGE_CONFIG_URL = 'https://api.vercel.com/v1/edge-config/ecfg_r5ttjeq5fpdw
 const API_TOKEN = 'Bearer 58W6mvFK9bVdAHyxRzAr0Aql';
 
 // Helper function to update Edge Config
-async function patchEdgeConfig(items) {
+async function patchEdgeConfig(key, value) {
   try {
     const response = await fetch(EDGE_CONFIG_URL, {
       method: 'PATCH',
@@ -15,17 +15,25 @@ async function patchEdgeConfig(items) {
         Authorization: API_TOKEN,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ items }),
+      body: JSON.stringify({
+        items: [
+          {
+            operation: 'update',
+            key,
+            value,
+          },
+        ],
+      }),
     });
 
     const result = await response.json();
     if (!response.ok) {
       throw new Error(`Edge Config update failed: ${result.message || 'Unknown error'}`);
     }
-    console.log('Patch result:', result);
+    console.log(`Updated ${key}:`, result);
     return result;
   } catch (error) {
-    console.error('Error patching Edge Config:', error);
+    console.error(`Error updating ${key}:`, error);
     throw error;
   }
 }
@@ -48,10 +56,10 @@ router.post('/experience', async (req, res) => {
 
   try {
     let experiences = (await get('experiences')) || [];
-    const newId = experiences.length + 1; // ID = index + 1
+    const newId = experiences.length > 0 ? Math.max(...experiences.map(exp => Number(exp.id))) + 1 : 1;
 
     const newExperience = {
-      id: newId,
+      id: newId.toString(), // ID'yi string olarak tutuyoruz, veri yapınıza uygun
       title,
       company,
       start_date,
@@ -59,14 +67,8 @@ router.post('/experience', async (req, res) => {
       description,
     };
 
-    // Yeni bir öğe eklemek için 'create' operasyonu
-    await patchEdgeConfig([
-      {
-        operation: 'create',
-        key: `experiences_${newId}`, // Her öğe için benzersiz bir key
-        value: newExperience,
-      },
-    ]);
+    experiences.push(newExperience);
+    await patchEdgeConfig('experiences', experiences);
 
     res.status(201).json(newExperience);
   } catch (error) {
@@ -79,21 +81,14 @@ router.delete('/experience/:id', async (req, res) => {
   const { id } = req.params;
 
   try {
-    const experiences = (await get('experiences')) || [];
-    const exists = experiences.some(exp => exp.id === Number(id));
+    let experiences = (await get('experiences')) || [];
+    const filteredExperiences = experiences.filter(exp => exp.id !== id);
 
-    if (!exists) {
+    if (filteredExperiences.length === experiences.length) {
       return res.status(404).json({ message: 'Deneyim bulunamadı' });
     }
 
-    // Öğeyi silmek için 'delete' operasyonu
-    await patchEdgeConfig([
-      {
-        operation: 'delete',
-        key: `experiences_${id}`,
-      },
-    ]);
-
+    await patchEdgeConfig('experiences', filteredExperiences);
     res.status(200).json({ message: 'Deneyim bilgisi silindi' });
   } catch (error) {
     res.status(500).json({ message: 'Sunucu hatası: ' + error.message });
@@ -103,24 +98,17 @@ router.delete('/experience/:id', async (req, res) => {
 // Experience Güncelleme
 async function updateExperience(id, updatedData) {
   try {
-    const experiences = (await get('experiences')) || [];
-    const index = experiences.findIndex(exp => exp.id === Number(id));
+    let experiences = (await get('experiences')) || [];
+    const index = experiences.findIndex(exp => exp.id === id);
 
     if (index === -1) {
       throw new Error('Experience not found');
     }
 
-    const updatedExperience = { ...experiences[index], ...updatedData };
+    experiences[index] = { ...experiences[index], ...updatedData };
+    await patchEdgeConfig('experiences', experiences);
 
-    await patchEdgeConfig([
-      {
-        operation: 'update',
-        key: `experiences_${id}`,
-        value: updatedExperience,
-      },
-    ]);
-
-    return updatedExperience;
+    return experiences[index];
   } catch (error) {
     console.error('Error updating experience:', error);
     throw new Error('Failed to update experience');
@@ -136,7 +124,7 @@ router.put('/experience/:id', async (req, res) => {
   }
 
   try {
-    await updateExperience(Number(id), { title, company, start_date, end_date, description });
+    await updateExperience(id, { title, company, start_date, end_date, description });
     res.status(200).json({ message: 'Experience updated successfully' });
   } catch (error) {
     console.error('Error details:', error);
@@ -164,11 +152,11 @@ router.post('/education', async (req, res) => {
   const { school, degree, field, startDate, endDate, description } = req.body;
 
   try {
-    const education = (await get('education')) || [];
-    const newId = education.length + 1; // ID = index + 1
+    let education = (await get('education')) || [];
+    const newId = education.length > 0 ? Math.max(...education.map(edu => Number(edu.id))) + 1 : 1;
 
     const newEducation = {
-      id: newId,
+      id: newId.toString(), // ID'yi string olarak tutuyoruz
       school,
       degree,
       field,
@@ -177,13 +165,8 @@ router.post('/education', async (req, res) => {
       description,
     };
 
-    await patchEdgeConfig([
-      {
-        operation: 'create',
-        key: `education_${newId}`,
-        value: newEducation,
-      },
-    ]);
+    education.push(newEducation);
+    await patchEdgeConfig('education', education);
 
     res.status(201).json(newEducation);
   } catch (error) {
@@ -197,20 +180,14 @@ router.delete('/education/:id', async (req, res) => {
   const { id } = req.params;
 
   try {
-    const education = (await get('education')) || [];
-    const exists = education.some(edu => edu.id === Number(id));
+    let education = (await get('education')) || [];
+    const filteredEducation = education.filter(edu => edu.id !== id);
 
-    if (!exists) {
+    if (filteredEducation.length === education.length) {
       return res.status(404).json({ message: 'Eğitim bulunamadı' });
     }
 
-    await patchEdgeConfig([
-      {
-        operation: 'delete',
-        key: `education_${id}`,
-      },
-    ]);
-
+    await patchEdgeConfig('education', filteredEducation);
     res.status(200).json({ message: 'Eğitim bilgisi silindi' });
   } catch (error) {
     res.status(500).json({ message: 'Sunucu hatası: ' + error.message });
@@ -220,24 +197,17 @@ router.delete('/education/:id', async (req, res) => {
 // Education Güncelleme
 async function updateEducation(id, updatedData) {
   try {
-    const education = (await get('education')) || [];
-    const index = education.findIndex(edu => edu.id === Number(id));
+    let education = (await get('education')) || [];
+    const index = education.findIndex(edu => edu.id === id);
 
     if (index === -1) {
       throw new Error('Education not found');
     }
 
-    const updatedEducation = { ...education[index], ...updatedData };
+    education[index] = { ...education[index], ...updatedData };
+    await patchEdgeConfig('education', education);
 
-    await patchEdgeConfig([
-      {
-        operation: 'update',
-        key: `education_${id}`,
-        value: updatedEducation,
-      },
-    ]);
-
-    return updatedEducation;
+    return education[index];
   } catch (error) {
     console.error('Error updating education:', error);
     throw new Error('Failed to update education');
@@ -253,7 +223,7 @@ router.put('/education/:id', async (req, res) => {
   }
 
   try {
-    await updateEducation(Number(id), { school, degree, field, startDate, endDate, description });
+    await updateEducation(id, { school, degree, field, startDate, endDate, description });
     res.status(200).json({ message: 'Eğitim bilgisi güncellendi' });
   } catch (error) {
     console.error('Error details:', error);
@@ -281,24 +251,19 @@ router.post('/projects', async (req, res) => {
   const { title, description, imageUrl, projectUrl } = req.body;
 
   try {
-    const projects = (await get('projects')) || [];
-    const newId = projects.length + 1; // ID = index + 1
+    let projects = (await get('projects')) || [];
+    const newId = projects.length > 0 ? Math.max(...projects.map(proj => Number(proj.id))) + 1 : 1;
 
     const newProject = {
-      id: newId,
+      id: newId.toString(), // ID'yi string olarak tutuyoruz
       title,
       description,
       imageUrl,
       projectUrl,
     };
 
-    await patchEdgeConfig([
-      {
-        operation: 'create',
-        key: `projects_${newId}`,
-        value: newProject,
-      },
-    ]);
+    projects.push(newProject);
+    await patchEdgeConfig('projects', projects);
 
     res.status(201).json(newProject);
   } catch (error) {
@@ -311,20 +276,14 @@ router.delete('/projects/:id', async (req, res) => {
   const { id } = req.params;
 
   try {
-    const projects = (await get('projects')) || [];
-    const exists = projects.some(proj => proj.id === Number(id));
+    let projects = (await get('projects')) || [];
+    const filteredProjects = projects.filter(proj => proj.id !== id);
 
-    if (!exists) {
+    if (filteredProjects.length === projects.length) {
       return res.status(404).json({ message: 'Proje bulunamadı' });
     }
 
-    await patchEdgeConfig([
-      {
-        operation: 'delete',
-        key: `projects_${id}`,
-      },
-    ]);
-
+    await patchEdgeConfig('projects', filteredProjects);
     res.status(200).json({ message: 'Proje silindi' });
   } catch (error) {
     res.status(500).json({ message: 'Sunucu hatası: ' + error.message });
@@ -334,24 +293,17 @@ router.delete('/projects/:id', async (req, res) => {
 // Project Güncelleme
 async function updateProject(id, updatedData) {
   try {
-    const projects = (await get('projects')) || [];
-    const index = projects.findIndex(proj => proj.id === Number(id));
+    let projects = (await get('projects')) || [];
+    const index = projects.findIndex(proj => proj.id === id);
 
     if (index === -1) {
       throw new Error('Project not found');
     }
 
-    const updatedProject = { ...projects[index], ...updatedData };
+    projects[index] = { ...projects[index], ...updatedData };
+    await patchEdgeConfig('projects', projects);
 
-    await patchEdgeConfig([
-      {
-        operation: 'update',
-        key: `projects_${id}`,
-        value: updatedProject,
-      },
-    ]);
-
-    return updatedProject;
+    return projects[index];
   } catch (error) {
     console.error('Error updating project:', error);
     throw new Error('Failed to update project');
@@ -367,7 +319,7 @@ router.put('/projects/:id', async (req, res) => {
   }
 
   try {
-    await updateProject(Number(id), { title, description, imageUrl, projectUrl });
+    await updateProject(id, { title, description, imageUrl, projectUrl });
     res.status(200).json({ message: 'Proje bilgisi güncellendi' });
   } catch (error) {
     console.error('Error details:', error);
