@@ -62,7 +62,7 @@ router.delete('/experience/:id', async (req, res) => {
 
 async function updateExperience(id, updatedData) {
   const experiences = await get('experiences') || [];
-  console.log(experiences)
+  console.log(experiences[id])
   const index = experiences.findIndex(exp => exp.id === Number(id)); // Ensure id is compared as a number
 
   if (index === -1) {
