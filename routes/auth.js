@@ -1,15 +1,8 @@
 const express = require('express');
-const cors = require('cors');
 const router = express.Router();
 
 const { get } = require('@vercel/edge-config');
 
-// CORS middleware (özellikle Vercel için önemli)
-router.use(cors({
-  origin: '*', // Geliştirme için: '*' | Prod için: 'https://seninfrontenddomain.com'
-  methods: ['GET', 'POST', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-}));
 
 router.use(express.json()); // JSON parse
 
