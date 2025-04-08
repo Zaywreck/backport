@@ -82,7 +82,7 @@ async function updateExperience(id, updatedData) {
       {
         method: 'PATCH',
         headers: {
-          Authorization: `Bearer f62367be-538f-4bcd-8d0b-dccfae836b2b`,
+          Authorization: `Bearer 58W6mvFK9bVdAHyxRzAr0Aql`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
