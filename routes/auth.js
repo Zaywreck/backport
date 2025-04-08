@@ -6,12 +6,8 @@ const { get } = require('@vercel/edge-config');
 
 router.use(express.json()); // JSON parse
 
-let userEmail = "";
-let userPassword = "";
 async function getUser() {
   const users = await get('users') || {};
-  userEmail = users.email || "";
-  userPassword = users.password || "";
   console.log('Kullanıcı bilgileri:', users);
   return users;
 }
@@ -34,10 +30,6 @@ router.post('/login', async (req, res) => {
     if (!user || user.password !== password) {
       return res.status(401).json({ message: 'Geçersiz e-posta veya şifre' });
     }
-
-    console.log('Giriş yapan kullanıcı:', user.email);
-    console.log('Giriş yapan kullanıcı şifre:', user.password);
-
     res.status(200).json({ message: 'Giriş başarılı' });
   } catch (error) {
     console.log('Giriş hatası:', error);

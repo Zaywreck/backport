@@ -81,7 +81,7 @@ router.put('/experience/:id', async (req, res) => {
     await updateExperience(Number(id), { title, company, startDate, endDate, description });
     res.status(200).json({ message: 'Deneyim bilgisi güncellendi' });
   } catch (error) {
-    res.status(500).json({ message: 'Sunucu hatası: ' + error.message });
+    res.status(500).json({ message: 'Sunucu hatası: ' + error.message + req.body + res.id });
   }
 });
 
