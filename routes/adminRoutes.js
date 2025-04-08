@@ -72,16 +72,28 @@ async function updateExperience(id, updatedData) {
   await set('experiences', experiences);
 }
 
-// Deneyim güncelleme
 router.put('/experience/:id', async (req, res) => {
   const { id } = req.params;
   const { title, company, startDate, endDate, description } = req.body;
 
   try {
-    await updateExperience(Number(id), { title, company, startDate, endDate, description });
+    // Call to the updateExperience function (assume it's defined elsewhere)
+    const updateResult = await updateExperience(Number(id), { title, company, startDate, endDate, description });
+
+    // If no experience was updated (e.g., not found), handle that case.
+    if (!updateResult) {
+      return res.status(404).json({ message: 'Deneyim bulunamadı' });
+    }
+
     res.status(200).json({ message: 'Deneyim bilgisi güncellendi' });
   } catch (error) {
-    res.status(500).json({ message: 'Sunucu hatası: ' + error.message + req.body + res.id });
+    // Improved error logging
+    console.error('Error details:', error); // Log full error for debugging
+    res.status(500).json({
+      message: `Sunucu hatası: ${error.message}`,
+      // Optional: You can log the request body for further debugging if needed
+      requestBody: req.body,
+    });
   }
 });
 
