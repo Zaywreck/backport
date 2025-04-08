@@ -3,6 +3,41 @@ const { get } = require('@vercel/edge-config');
 
 const router = express.Router();
 
+const EDGE_CONFIG_URL = 'https://api.vercel.com/v1/edge-config/ecfg_r5ttjeq5fpdwcyl7muoowf83nad1/items';
+const API_TOKEN = 'Bearer 58W6mvFK9bVdAHyxRzAr0Aql';
+
+// Helper function to update Edge Config
+async function updateEdgeConfig(key, value) {
+  try {
+    const response = await fetch(EDGE_CONFIG_URL, {
+      method: 'PATCH',
+      headers: {
+        Authorization: API_TOKEN,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        items: [
+          {
+            operation: 'update',
+            key,
+            value,
+          },
+        ],
+      }),
+    });
+
+    const result = await response.json();
+    if (!response.ok) {
+      throw new Error(`Edge Config update failed: ${result.message || 'Unknown error'}`);
+    }
+    console.log(`Updated ${key}:`, result);
+    return result;
+  } catch (error) {
+    console.error(`Error updating ${key}:`, error);
+    throw error;
+  }
+}
+
 // ===================== Experience =====================
 
 // Experience Bilgilerini Listele
@@ -21,7 +56,7 @@ router.post('/experience', async (req, res) => {
 
   try {
     let experiences = (await get('experiences')) || [];
-    const newId = experiences.length > 0 ? Math.max(...experiences.map(exp => exp.id)) + 1 : 1;
+    const newId = experiences.length + 1; // ID = index + 1
 
     const newExperience = {
       id: newId,
@@ -33,7 +68,7 @@ router.post('/experience', async (req, res) => {
     };
 
     experiences.push(newExperience);
-    await set('experiences', experiences);
+    await updateEdgeConfig('experiences', experiences);
 
     res.status(201).json(newExperience);
   } catch (error) {
@@ -53,63 +88,38 @@ router.delete('/experience/:id', async (req, res) => {
       return res.status(404).json({ message: 'Deneyim bulunamadı' });
     }
 
-    await set('experiences', filteredExperiences);
+    await updateEdgeConfig('experiences', filteredExperiences);
     res.status(200).json({ message: 'Deneyim bilgisi silindi' });
   } catch (error) {
     res.status(500).json({ message: 'Sunucu hatası: ' + error.message });
   }
 });
 
+// Experience Güncelleme
 async function updateExperience(id, updatedData) {
   try {
     const experiencesJson = await get('experiences');
-
     const experiences = typeof experiencesJson === 'string' ? JSON.parse(experiencesJson) : experiencesJson;
+
     if (!Array.isArray(experiences)) {
       throw new Error('Experiences data is not an array');
     }
-    const index = experiences.findIndex(experience => experience.id === id.toString());
 
-    if (index === -1) {
+    const index = id - 1; // ID = index + 1 olduğundan
+    if (index < 0 || index >= experiences.length) {
       throw new Error('Experience not found');
     }
 
     experiences[index] = { ...experiences[index], ...updatedData };
+    await updateEdgeConfig('experiences', experiences);
 
-    const response = await fetch(
-      'https://api.vercel.com/v1/edge-config/ecfg_r5ttjeq5fpdwcyl7muoowf83nad1/items',
-      {
-        method: 'PATCH',
-        headers: {
-          Authorization: `Bearer 58W6mvFK9bVdAHyxRzAr0Aql`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          items: [
-            {
-              operation: 'update',
-              key: 'experiences',
-              value: experiences,
-            },
-          ],
-        }),
-      }
-    );
-
-    const result = await response.json();
-    console.log('Updated experiences:', result);
-
-    return result;
-
+    return experiences[index];
   } catch (error) {
     console.error('Error updating experience:', error);
     throw new Error('Failed to update experience');
   }
 }
 
-
-
-// PUT endpoint to update an experience
 router.put('/experience/:id', async (req, res) => {
   const { id } = req.params;
   const { title, company, start_date, end_date, description } = req.body;
@@ -119,19 +129,16 @@ router.put('/experience/:id', async (req, res) => {
   }
 
   try {
-    // Update the experience with the given ID and updated data
     await updateExperience(Number(id), { title, company, start_date, end_date, description });
-
     res.status(200).json({ message: 'Experience updated successfully' });
   } catch (error) {
-    console.error('Error details:', error); // Log full error for debugging
+    console.error('Error details:', error);
     res.status(500).json({
       message: `Server error: ${error.message}`,
       requestBody: req.body,
     });
   }
 });
-
 
 // ===================== Education =====================
 
@@ -145,17 +152,16 @@ router.get('/education', async (req, res) => {
   }
 });
 
-
+// Yeni Education Bilgisi Ekle
 router.post('/education', async (req, res) => {
   const { school, degree, field, startDate, endDate, description } = req.body;
 
   try {
-    // Eğitim bilgilerini alıyoruz
     const education = (await get('education')) || [];
+    const newId = education.length + 1; // ID = index + 1
 
-    // Yeni eğitim bilgisi
     const newEducation = {
-      id: education.length + 1,
+      id: newId,
       school,
       degree,
       field,
@@ -164,20 +170,15 @@ router.post('/education', async (req, res) => {
       description,
     };
 
-    // Eğitim verisini güncelleme
     const updatedEducation = [...education, newEducation];
+    await updateEdgeConfig('education', updatedEducation);
 
-    // Yeni veriyi kaydediyoruz
-    await set('education', updatedEducation);
-
-    // Başarıyla eklenen eğitim bilgisini döndürüyoruz
     res.status(201).json(newEducation);
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Sunucu hatası: ' + error.message });
   }
 });
-
 
 // Education Bilgisi Silme
 router.delete('/education/:id', async (req, res) => {
@@ -191,13 +192,14 @@ router.delete('/education/:id', async (req, res) => {
       return res.status(404).json({ message: 'Eğitim bulunamadı' });
     }
 
-    await set('education', filteredEducation);
+    await updateEdgeConfig('education', filteredEducation);
     res.status(200).json({ message: 'Eğitim bilgisi silindi' });
   } catch (error) {
     res.status(500).json({ message: 'Sunucu hatası: ' + error.message });
   }
 });
 
+// Education Güncelleme
 async function updateEducation(id, updatedData) {
   try {
     const educationJson = await get('education');
@@ -207,58 +209,34 @@ async function updateEducation(id, updatedData) {
       throw new Error('Education data is not an array');
     }
 
-    const index = id - 1; // ID = index + 1 olduğundan, index = id - 1
+    const index = id - 1; // ID = index + 1 olduğundan
     if (index < 0 || index >= education.length) {
       throw new Error('Education not found');
     }
 
     education[index] = { ...education[index], ...updatedData };
+    await updateEdgeConfig('education', education);
 
-    const response = await fetch(
-      'https://api.vercel.com/v1/edge-config/ecfg_r5ttjeq5fpdwcyl7muoowf83nad1/items',
-      {
-        method: 'PATCH',
-        headers: {
-          Authorization: `Bearer 58W6mvFK9bVdAHyxRzAr0Aql`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          items: [
-            {
-              operation: 'update',
-              key: 'education',
-              value: education,
-            },
-          ],
-        }),
-      }
-    );
-
-    const result = await response.json();
-    console.log('Updated education:', result);
-
-    return result;
+    return education[index];
   } catch (error) {
     console.error('Error updating education:', error);
     throw new Error('Failed to update education');
   }
 }
-// Eğitim güncelleme
+
 router.put('/education/:id', async (req, res) => {
   const { id } = req.params;
-  const { school, degree, field, start_date, end_date, description } = req.body;
+  const { school, degree, field, startDate, endDate, description } = req.body;
 
-  if (!school || !degree || !field || !start_date || !description) {
+  if (!school || !degree || !field || !startDate || !description) {
     return res.status(400).json({ message: 'Missing required fields' });
   }
 
   try {
-    // Eğitim bilgilerini güncelle
-    await updateEducation(Number(id), { school, degree, field, start_date, end_date, description });
-
+    await updateEducation(Number(id), { school, degree, field, startDate, endDate, description });
     res.status(200).json({ message: 'Eğitim bilgisi güncellendi' });
   } catch (error) {
-    console.error('Error details:', error); // Log full error for debugging
+    console.error('Error details:', error);
     res.status(500).json({
       message: `Sunucu hatası: ${error.message}`,
       requestBody: req.body,
@@ -284,7 +262,7 @@ router.post('/projects', async (req, res) => {
 
   try {
     let projects = (await get('projects')) || [];
-    const newId = projects.length > 0 ? Math.max(...projects.map(proj => proj.id)) + 1 : 1;
+    const newId = projects.length + 1; // ID = index + 1
 
     const newProject = {
       id: newId,
@@ -295,7 +273,7 @@ router.post('/projects', async (req, res) => {
     };
 
     projects.push(newProject);
-    await set('projects', projects);
+    await updateEdgeConfig('projects', projects);
 
     res.status(201).json(newProject);
   } catch (error) {
@@ -315,13 +293,14 @@ router.delete('/projects/:id', async (req, res) => {
       return res.status(404).json({ message: 'Proje bulunamadı' });
     }
 
-    await set('projects', filteredProjects);
+    await updateEdgeConfig('projects', filteredProjects);
     res.status(200).json({ message: 'Proje silindi' });
   } catch (error) {
     res.status(500).json({ message: 'Sunucu hatası: ' + error.message });
   }
 });
 
+// Project Güncelleme
 async function updateProject(id, updatedData) {
   try {
     const projectsJson = await get('projects');
@@ -331,43 +310,21 @@ async function updateProject(id, updatedData) {
       throw new Error('Projects data is not an array');
     }
 
-    const index = id - 1; // ID = index + 1 olduğundan, index = id - 1
+    const index = id - 1; // ID = index + 1 olduğundan
     if (index < 0 || index >= projects.length) {
       throw new Error('Project not found');
     }
 
     projects[index] = { ...projects[index], ...updatedData };
+    await updateEdgeConfig('projects', projects);
 
-    const response = await fetch(
-      'https://api.vercel.com/v1/edge-config/ecfg_r5ttjeq5fpdwcyl7muoowf83nad1/items',
-      {
-        method: 'PATCH',
-        headers: {
-          Authorization: `Bearer 58W6mvFK9bVdAHyxRzAr0Aql`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          items: [
-            {
-              operation: 'update',
-              key: 'projects',
-              value: projects,
-            },
-          ],
-        }),
-      }
-    );
-
-    const result = await response.json();
-    console.log('Updated projects:', result);
-
-    return result;
+    return projects[index];
   } catch (error) {
     console.error('Error updating project:', error);
     throw new Error('Failed to update project');
   }
 }
-// Project güncelleme
+
 router.put('/projects/:id', async (req, res) => {
   const { id } = req.params;
   const { title, description, imageUrl, projectUrl } = req.body;
@@ -377,12 +334,10 @@ router.put('/projects/:id', async (req, res) => {
   }
 
   try {
-    // Proje bilgilerini güncelle
     await updateProject(Number(id), { title, description, imageUrl, projectUrl });
-
     res.status(200).json({ message: 'Proje bilgisi güncellendi' });
   } catch (error) {
-    console.error('Error details:', error); // Log full error for debugging
+    console.error('Error details:', error);
     res.status(500).json({
       message: `Sunucu hatası: ${error.message}`,
       requestBody: req.body,
