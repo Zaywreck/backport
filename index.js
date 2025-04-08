@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const adminRoutes = require('./routes/adminRoutes');
+const authRoutes = require('./routes/auth');
 
 const app = express();
 
@@ -17,6 +18,7 @@ app.get('/', (req, res) => {
 
 // Routes
 app.use('/api/admin', adminRoutes);
+app.use('/api/auth', authRoutes);
 
 // Sunucu başlatma
 const PORT = 3169;
