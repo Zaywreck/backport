@@ -65,7 +65,7 @@ async function updateExperience(id, updatedData) {
     // Fetch current experiences from Vercel Edge Config
     const experiencesJson = await get('experiences');
     
-    // Ensure experiencesJson is a string before parsing it
+    // Parse experiences if it's a string
     const experiences = typeof experiencesJson === 'string' ? JSON.parse(experiencesJson) : experiencesJson;
 
     // If experiences is not an array, initialize it as an empty array
@@ -83,6 +83,9 @@ async function updateExperience(id, updatedData) {
     // Update the experience at the specified index with the new data
     experiences[index] = { ...experiences[index], ...updatedData };
 
+    // Now re-stringify the experiences array
+    const experiencesStringified = JSON.stringify(experiences);
+
     // Now update Edge Config using Vercel API (PATCH)
     const response = await fetch(
       'https://api.vercel.com/v1/edge-config/ecfg_r5ttjeq5fpdwcyl7muoowf83nad1/items',
@@ -97,7 +100,7 @@ async function updateExperience(id, updatedData) {
             {
               operation: 'update',
               key: 'experiences',
-              value: JSON.stringify(experiences), // Update experiences data
+              value: experiencesStringified, // Update experiences data
             },
           ],
         }),
@@ -114,6 +117,7 @@ async function updateExperience(id, updatedData) {
     throw new Error('Failed to update experience');
   }
 }
+
 
 
 // PUT endpoint to update an experience
