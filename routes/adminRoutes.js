@@ -62,9 +62,16 @@ router.delete('/experience/:id', async (req, res) => {
 
 async function updateExperience(id, updatedData) {
   try {
-    // Fetch current experiences from Vercel Edge Config and parse the JSON string
+    // Fetch current experiences from Vercel Edge Config
     const experiencesJson = await get('experiences');
-    const experiences = experiencesJson ? JSON.parse(experiencesJson) : [];
+    
+    // Ensure experiencesJson is a string before parsing it
+    const experiences = typeof experiencesJson === 'string' ? JSON.parse(experiencesJson) : experiencesJson;
+
+    // If experiences is not an array, initialize it as an empty array
+    if (!Array.isArray(experiences)) {
+      throw new Error('Experiences data is not an array');
+    }
 
     // Find the experience index by matching the ID
     const index = experiences.findIndex(experience => experience.id === id.toString());
