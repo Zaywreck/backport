@@ -83,9 +83,6 @@ async function updateExperience(id, updatedData) {
     // Update the experience at the specified index with the new data
     experiences[index] = { ...experiences[index], ...updatedData };
 
-    // Now re-stringify the experiences array
-    const experiencesStringified = JSON.stringify(experiences);
-
     // Now update Edge Config using Vercel API (PATCH)
     const response = await fetch(
       'https://api.vercel.com/v1/edge-config/ecfg_r5ttjeq5fpdwcyl7muoowf83nad1/items',
@@ -100,7 +97,7 @@ async function updateExperience(id, updatedData) {
             {
               operation: 'update',
               key: 'experiences',
-              value: experiencesStringified, // Update experiences data
+              value: experiences, // Update experiences data
             },
           ],
         }),
