@@ -1,5 +1,5 @@
 const express = require('express');
-const { get, set } = require('@vercel/edge-config');
+const { get } = require('@vercel/edge-config');
 
 const router = express.Router();
 
@@ -61,35 +61,70 @@ router.delete('/experience/:id', async (req, res) => {
 });
 
 async function updateExperience(id, updatedData) {
-  const experiences = await get('experiences') || [];
-  console.log(experiences[id-1]); // This will show the experience at index id-1 (since arrays are 0-indexed)
-  
-  const index = id - 1; // Subtract 1 to match the experience index with the id provided.
+  try {
+    // Fetch current experiences from Vercel Edge Config
+    const experiences = await get('experiences') || [];
 
-  if (index < 0 || index >= experiences.length) {
-    throw new Error('Deneyim bulunamadı');
+    // Find the experience index by matching the ID
+    const index = id - 1; // Arrays are zero-indexed, so subtract 1
+
+    if (index < 0 || index >= experiences.length) {
+      throw new Error('Experience not found');
+    }
+
+    // Update the experience at the specified index with the new data
+    experiences[index] = { ...experiences[index], ...updatedData };
+
+    // Now update Edge Config using Vercel API (PATCH)
+    const response = await fetch(
+      'https://api.vercel.com/v1/edge-config/your_edge_config_id_here/items',
+      {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${your_vercel_api_token_here}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          items: [
+            {
+              operation: 'update',
+              key: 'experiences',
+              value: JSON.stringify(experiences), // Update experiences data
+            },
+          ],
+        }),
+      }
+    );
+
+    const result = await response.json();
+    console.log('Updated experiences:', result);
+
+    return result; // Return the result of the update
+
+  } catch (error) {
+    console.error('Error updating experience:', error);
+    throw new Error('Failed to update experience');
   }
-
-  experiences[index] = { ...experiences[index], ...updatedData };
-  await set('experiences', experiences);
 }
 
-
-
+// PUT endpoint to update an experience
 router.put('/experience/:id', async (req, res) => {
   const { id } = req.params;
   const { title, company, startDate, endDate, description } = req.body;
 
+  if (!title || !company || !startDate || !description) {
+    return res.status(400).json({ message: 'Missing required fields' });
+  }
+
   try {
-    // Call the updateExperience function with the id and updated data
+    // Update the experience with the given ID and updated data
     await updateExperience(Number(id), { title, company, startDate, endDate, description });
 
-    res.status(200).json({ message: 'Deneyim bilgisi güncellendi' });
+    res.status(200).json({ message: 'Experience updated successfully' });
   } catch (error) {
-    // Improved error logging
     console.error('Error details:', error); // Log full error for debugging
     res.status(500).json({
-      message: `Sunucu hatası: ${error.message}`,
+      message: `Server error: ${error.message}`,
       requestBody: req.body,
     });
   }
