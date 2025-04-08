@@ -111,7 +111,7 @@ async function updateExperience(id, updatedData) {
 // PUT endpoint to update an experience
 router.put('/experience/:id', async (req, res) => {
   const { id } = req.params;
-  const { title, company, startDate, endDate, description } = req.body;
+  const { title, company, start_date, end_date, description } = req.body;
 
   if (!title || !company || !startDate || !description) {
     return res.status(400).json({ message: 'Missing required fields' });
@@ -119,7 +119,7 @@ router.put('/experience/:id', async (req, res) => {
 
   try {
     // Update the experience with the given ID and updated data
-    await updateExperience(Number(id), { title, company, startDate, endDate, description });
+    await updateExperience(Number(id), { title, company, start_date, end_date, description });
 
     res.status(200).json({ message: 'Experience updated successfully' });
   } catch (error) {
