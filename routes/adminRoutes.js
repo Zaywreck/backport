@@ -17,7 +17,7 @@ router.get('/experience', async (req, res) => {
 
 // Yeni Experience Bilgisi Ekle
 router.post('/experience', async (req, res) => {
-  const { title, company, startDate, endDate, description } = req.body;
+  const { title, company, start_date, end_date, description } = req.body;
 
   try {
     let experiences = (await get('experiences')) || [];
@@ -27,8 +27,8 @@ router.post('/experience', async (req, res) => {
       id: newId,
       title,
       company,
-      startDate,
-      endDate,
+      start_date,
+      end_date,
       description,
     };
 
@@ -113,7 +113,7 @@ router.put('/experience/:id', async (req, res) => {
   const { id } = req.params;
   const { title, company, start_date, end_date, description } = req.body;
 
-  if (!title || !company || !startDate || !description) {
+  if (!title || !company || !start_date || !description) {
     return res.status(400).json({ message: 'Missing required fields' });
   }
 
