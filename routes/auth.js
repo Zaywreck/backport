@@ -2,10 +2,14 @@ const express = require('express');
 const router = express.Router();
 
 const { get } = require('@vercel/edge-config');
-
-async function getUserByEmail(email) {
-  const users = await get('users') || [];
-  return users.find(user => user.email === email);
+let userEmail = "";
+let userPassword = "";
+async function getUser() {
+  const users = await get('users') || {};
+  userEmail = users.email || "";
+  userPassword = users.password || "";
+  console.log('Kullanıcı bilgileri:', users);
+  return users;
 }
 
 router.post('/login', async (req, res) => {
