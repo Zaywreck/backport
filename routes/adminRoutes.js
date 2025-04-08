@@ -7,7 +7,7 @@ const EDGE_CONFIG_URL = 'https://api.vercel.com/v1/edge-config/ecfg_r5ttjeq5fpdw
 const API_TOKEN = 'Bearer 58W6mvFK9bVdAHyxRzAr0Aql';
 
 // Helper function to update Edge Config
-async function updateEdgeConfig(key, value) {
+async function patchEdgeConfig(items) {
   try {
     const response = await fetch(EDGE_CONFIG_URL, {
       method: 'PATCH',
@@ -15,25 +15,17 @@ async function updateEdgeConfig(key, value) {
         Authorization: API_TOKEN,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        items: [
-          {
-            operation: 'update',
-            key,
-            value,
-          },
-        ],
-      }),
+      body: JSON.stringify({ items }),
     });
 
     const result = await response.json();
     if (!response.ok) {
       throw new Error(`Edge Config update failed: ${result.message || 'Unknown error'}`);
     }
-    console.log(`Updated ${key}:`, result);
+    console.log('Patch result:', result);
     return result;
   } catch (error) {
-    console.error(`Error updating ${key}:`, error);
+    console.error('Error patching Edge Config:', error);
     throw error;
   }
 }
@@ -67,8 +59,14 @@ router.post('/experience', async (req, res) => {
       description,
     };
 
-    experiences.push(newExperience);
-    await updateEdgeConfig('experiences', experiences);
+    // Yeni bir öğe eklemek için 'create' operasyonu
+    await patchEdgeConfig([
+      {
+        operation: 'create',
+        key: `experiences_${newId}`, // Her öğe için benzersiz bir key
+        value: newExperience,
+      },
+    ]);
 
     res.status(201).json(newExperience);
   } catch (error) {
@@ -81,14 +79,21 @@ router.delete('/experience/:id', async (req, res) => {
   const { id } = req.params;
 
   try {
-    let experiences = (await get('experiences')) || [];
-    const filteredExperiences = experiences.filter(exp => exp.id !== Number(id));
+    const experiences = (await get('experiences')) || [];
+    const exists = experiences.some(exp => exp.id === Number(id));
 
-    if (filteredExperiences.length === experiences.length) {
+    if (!exists) {
       return res.status(404).json({ message: 'Deneyim bulunamadı' });
     }
 
-    await updateEdgeConfig('experiences', filteredExperiences);
+    // Öğeyi silmek için 'delete' operasyonu
+    await patchEdgeConfig([
+      {
+        operation: 'delete',
+        key: `experiences_${id}`,
+      },
+    ]);
+
     res.status(200).json({ message: 'Deneyim bilgisi silindi' });
   } catch (error) {
     res.status(500).json({ message: 'Sunucu hatası: ' + error.message });
@@ -98,22 +103,24 @@ router.delete('/experience/:id', async (req, res) => {
 // Experience Güncelleme
 async function updateExperience(id, updatedData) {
   try {
-    const experiencesJson = await get('experiences');
-    const experiences = typeof experiencesJson === 'string' ? JSON.parse(experiencesJson) : experiencesJson;
+    const experiences = (await get('experiences')) || [];
+    const index = experiences.findIndex(exp => exp.id === Number(id));
 
-    if (!Array.isArray(experiences)) {
-      throw new Error('Experiences data is not an array');
-    }
-
-    const index = id - 1; // ID = index + 1 olduğundan
-    if (index < 0 || index >= experiences.length) {
+    if (index === -1) {
       throw new Error('Experience not found');
     }
 
-    experiences[index] = { ...experiences[index], ...updatedData };
-    await updateEdgeConfig('experiences', experiences);
+    const updatedExperience = { ...experiences[index], ...updatedData };
 
-    return experiences[index];
+    await patchEdgeConfig([
+      {
+        operation: 'update',
+        key: `experiences_${id}`,
+        value: updatedExperience,
+      },
+    ]);
+
+    return updatedExperience;
   } catch (error) {
     console.error('Error updating experience:', error);
     throw new Error('Failed to update experience');
@@ -170,8 +177,13 @@ router.post('/education', async (req, res) => {
       description,
     };
 
-    const updatedEducation = [...education, newEducation];
-    await updateEdgeConfig('education', updatedEducation);
+    await patchEdgeConfig([
+      {
+        operation: 'create',
+        key: `education_${newId}`,
+        value: newEducation,
+      },
+    ]);
 
     res.status(201).json(newEducation);
   } catch (error) {
@@ -185,14 +197,20 @@ router.delete('/education/:id', async (req, res) => {
   const { id } = req.params;
 
   try {
-    let education = (await get('education')) || [];
-    const filteredEducation = education.filter(edu => edu.id !== Number(id));
+    const education = (await get('education')) || [];
+    const exists = education.some(edu => edu.id === Number(id));
 
-    if (filteredEducation.length === education.length) {
+    if (!exists) {
       return res.status(404).json({ message: 'Eğitim bulunamadı' });
     }
 
-    await updateEdgeConfig('education', filteredEducation);
+    await patchEdgeConfig([
+      {
+        operation: 'delete',
+        key: `education_${id}`,
+      },
+    ]);
+
     res.status(200).json({ message: 'Eğitim bilgisi silindi' });
   } catch (error) {
     res.status(500).json({ message: 'Sunucu hatası: ' + error.message });
@@ -202,22 +220,24 @@ router.delete('/education/:id', async (req, res) => {
 // Education Güncelleme
 async function updateEducation(id, updatedData) {
   try {
-    const educationJson = await get('education');
-    const education = typeof educationJson === 'string' ? JSON.parse(educationJson) : educationJson;
+    const education = (await get('education')) || [];
+    const index = education.findIndex(edu => edu.id === Number(id));
 
-    if (!Array.isArray(education)) {
-      throw new Error('Education data is not an array');
-    }
-
-    const index = id - 1; // ID = index + 1 olduğundan
-    if (index < 0 || index >= education.length) {
+    if (index === -1) {
       throw new Error('Education not found');
     }
 
-    education[index] = { ...education[index], ...updatedData };
-    await updateEdgeConfig('education', education);
+    const updatedEducation = { ...education[index], ...updatedData };
 
-    return education[index];
+    await patchEdgeConfig([
+      {
+        operation: 'update',
+        key: `education_${id}`,
+        value: updatedEducation,
+      },
+    ]);
+
+    return updatedEducation;
   } catch (error) {
     console.error('Error updating education:', error);
     throw new Error('Failed to update education');
@@ -261,7 +281,7 @@ router.post('/projects', async (req, res) => {
   const { title, description, imageUrl, projectUrl } = req.body;
 
   try {
-    let projects = (await get('projects')) || [];
+    const projects = (await get('projects')) || [];
     const newId = projects.length + 1; // ID = index + 1
 
     const newProject = {
@@ -272,8 +292,13 @@ router.post('/projects', async (req, res) => {
       projectUrl,
     };
 
-    projects.push(newProject);
-    await updateEdgeConfig('projects', projects);
+    await patchEdgeConfig([
+      {
+        operation: 'create',
+        key: `projects_${newId}`,
+        value: newProject,
+      },
+    ]);
 
     res.status(201).json(newProject);
   } catch (error) {
@@ -286,14 +311,20 @@ router.delete('/projects/:id', async (req, res) => {
   const { id } = req.params;
 
   try {
-    let projects = (await get('projects')) || [];
-    const filteredProjects = projects.filter(proj => proj.id !== Number(id));
+    const projects = (await get('projects')) || [];
+    const exists = projects.some(proj => proj.id === Number(id));
 
-    if (filteredProjects.length === projects.length) {
+    if (!exists) {
       return res.status(404).json({ message: 'Proje bulunamadı' });
     }
 
-    await updateEdgeConfig('projects', filteredProjects);
+    await patchEdgeConfig([
+      {
+        operation: 'delete',
+        key: `projects_${id}`,
+      },
+    ]);
+
     res.status(200).json({ message: 'Proje silindi' });
   } catch (error) {
     res.status(500).json({ message: 'Sunucu hatası: ' + error.message });
@@ -303,22 +334,24 @@ router.delete('/projects/:id', async (req, res) => {
 // Project Güncelleme
 async function updateProject(id, updatedData) {
   try {
-    const projectsJson = await get('projects');
-    const projects = typeof projectsJson === 'string' ? JSON.parse(projectsJson) : projectsJson;
+    const projects = (await get('projects')) || [];
+    const index = projects.findIndex(proj => proj.id === Number(id));
 
-    if (!Array.isArray(projects)) {
-      throw new Error('Projects data is not an array');
-    }
-
-    const index = id - 1; // ID = index + 1 olduğundan
-    if (index < 0 || index >= projects.length) {
+    if (index === -1) {
       throw new Error('Project not found');
     }
 
-    projects[index] = { ...projects[index], ...updatedData };
-    await updateEdgeConfig('projects', projects);
+    const updatedProject = { ...projects[index], ...updatedData };
 
-    return projects[index];
+    await patchEdgeConfig([
+      {
+        operation: 'update',
+        key: `projects_${id}`,
+        value: updatedProject,
+      },
+    ]);
+
+    return updatedProject;
   } catch (error) {
     console.error('Error updating project:', error);
     throw new Error('Failed to update project');
