@@ -60,6 +60,31 @@ router.delete('/experience/:id', async (req, res) => {
   }
 });
 
+async function updateExperience(id, updatedData) {
+  const experiences = await get('experiences') || [];
+  const index = experiences.findIndex(exp => exp.id === id);
+
+  if (index === -1) {
+    throw new Error('Deneyim bulunamadı');
+  }
+
+  experiences[index] = { ...experiences[index], ...updatedData };
+  await set('experiences', experiences);
+}
+
+// Deneyim güncelleme
+router.put('/experience/:id', async (req, res) => {
+  const { id } = req.params;
+  const { title, company, startDate, endDate, description } = req.body;
+
+  try {
+    await updateExperience(Number(id), { title, company, startDate, endDate, description });
+    res.status(200).json({ message: 'Deneyim bilgisi güncellendi' });
+  } catch (error) {
+    res.status(500).json({ message: 'Sunucu hatası: ' + error.message });
+  }
+});
+
 // ===================== Education =====================
 
 // Education Bilgilerini Listele
@@ -93,7 +118,7 @@ router.post('/education', async (req, res) => {
 
     // Eğitim verisini güncelleme
     const updatedEducation = [...education, newEducation];
-    
+
     // Yeni veriyi kaydediyoruz
     await set('education', updatedEducation);
 
@@ -120,6 +145,27 @@ router.delete('/education/:id', async (req, res) => {
 
     await set('education', filteredEducation);
     res.status(200).json({ message: 'Eğitim bilgisi silindi' });
+  } catch (error) {
+    res.status(500).json({ message: 'Sunucu hatası: ' + error.message });
+  }
+});
+// Eğitim güncelleme
+router.put('/education/:id', async (req, res) => {
+  const { id } = req.params;
+  const { school, degree, field, startDate, endDate, description } = req.body;
+
+  try {
+    let education = (await get('education')) || [];
+    const index = education.findIndex(edu => edu.id === Number(id));
+
+    if (index === -1) {
+      return res.status(404).json({ message: 'Eğitim bulunamadı' });
+    }
+
+    education[index] = { ...education[index], school, degree, field, startDate, endDate, description };
+    await set('education', education);
+
+    res.status(200).json({ message: 'Eğitim bilgisi güncellendi' });
   } catch (error) {
     res.status(500).json({ message: 'Sunucu hatası: ' + error.message });
   }
@@ -176,6 +222,27 @@ router.delete('/projects/:id', async (req, res) => {
 
     await set('projects', filteredProjects);
     res.status(200).json({ message: 'Proje silindi' });
+  } catch (error) {
+    res.status(500).json({ message: 'Sunucu hatası: ' + error.message });
+  }
+});
+// Project güncelleme
+router.put('/projects/:id', async (req, res) => {
+  const { id } = req.params;
+  const { title, description, imageUrl, projectUrl } = req.body;
+
+  try {
+    let projects = (await get('projects')) || [];
+    const index = projects.findIndex(proj => proj.id === Number(id));
+
+    if (index === -1) {
+      return res.status(404).json({ message: 'Proje bulunamadı' });
+    }
+
+    projects[index] = { ...projects[index], title, description, imageUrl, projectUrl };
+    await set('projects', projects);
+
+    res.status(200).json({ message: 'Proje bilgisi güncellendi' });
   } catch (error) {
     res.status(500).json({ message: 'Sunucu hatası: ' + error.message });
   }
