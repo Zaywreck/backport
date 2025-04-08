@@ -62,6 +62,7 @@ router.delete('/experience/:id', async (req, res) => {
 
 async function updateExperience(id, updatedData) {
   const experiences = await get('experiences') || [];
+  console.log(experiences)
   const index = experiences.findIndex(exp => exp.id === Number(id)); // Ensure id is compared as a number
 
   if (index === -1) {
@@ -83,7 +84,7 @@ router.put('/experience/:id', async (req, res) => {
 
     // If no experience was updated (e.g., not found), handle that case.
     if (!updateResult) {
-      return res.status(404).json({ message: 'Deneyim bulunamadı' });
+      return res.status(404).json({ message: 'Deneyim bulunamadı'});
     }
 
     res.status(200).json({ message: 'Deneyim bilgisi güncellendi' });
