@@ -62,28 +62,20 @@ router.delete('/experience/:id', async (req, res) => {
 
 async function updateExperience(id, updatedData) {
   try {
-    // Fetch current experiences from Vercel Edge Config
     const experiencesJson = await get('experiences');
-    
-    // Parse experiences if it's a string
-    const experiences = typeof experiencesJson === 'string' ? JSON.parse(experiencesJson) : experiencesJson;
 
-    // If experiences is not an array, initialize it as an empty array
+    const experiences = typeof experiencesJson === 'string' ? JSON.parse(experiencesJson) : experiencesJson;
     if (!Array.isArray(experiences)) {
       throw new Error('Experiences data is not an array');
     }
-
-    // Find the experience index by matching the ID
     const index = experiences.findIndex(experience => experience.id === id.toString());
 
     if (index === -1) {
       throw new Error('Experience not found');
     }
 
-    // Update the experience at the specified index with the new data
     experiences[index] = { ...experiences[index], ...updatedData };
 
-    // Now update Edge Config using Vercel API (PATCH)
     const response = await fetch(
       'https://api.vercel.com/v1/edge-config/ecfg_r5ttjeq5fpdwcyl7muoowf83nad1/items',
       {
@@ -97,7 +89,7 @@ async function updateExperience(id, updatedData) {
             {
               operation: 'update',
               key: 'experiences',
-              value: experiences, // Update experiences data
+              value: experiences,
             },
           ],
         }),
@@ -107,7 +99,7 @@ async function updateExperience(id, updatedData) {
     const result = await response.json();
     console.log('Updated experiences:', result);
 
-    return result; // Return the result of the update
+    return result;
 
   } catch (error) {
     console.error('Error updating experience:', error);
@@ -205,25 +197,72 @@ router.delete('/education/:id', async (req, res) => {
     res.status(500).json({ message: 'Sunucu hatası: ' + error.message });
   }
 });
+
+async function updateEducation(id, updatedData) {
+  try {
+    const educationJson = await get('education');
+    const education = typeof educationJson === 'string' ? JSON.parse(educationJson) : educationJson;
+
+    if (!Array.isArray(education)) {
+      throw new Error('Education data is not an array');
+    }
+
+    const index = id - 1; // ID = index + 1 olduğundan, index = id - 1
+    if (index < 0 || index >= education.length) {
+      throw new Error('Education not found');
+    }
+
+    education[index] = { ...education[index], ...updatedData };
+
+    const response = await fetch(
+      'https://api.vercel.com/v1/edge-config/ecfg_r5ttjeq5fpdwcyl7muoowf83nad1/items',
+      {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer 58W6mvFK9bVdAHyxRzAr0Aql`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          items: [
+            {
+              operation: 'update',
+              key: 'education',
+              value: education,
+            },
+          ],
+        }),
+      }
+    );
+
+    const result = await response.json();
+    console.log('Updated education:', result);
+
+    return result;
+  } catch (error) {
+    console.error('Error updating education:', error);
+    throw new Error('Failed to update education');
+  }
+}
 // Eğitim güncelleme
 router.put('/education/:id', async (req, res) => {
   const { id } = req.params;
-  const { school, degree, field, startDate, endDate, description } = req.body;
+  const { school, degree, field, start_date, end_date, description } = req.body;
+
+  if (!school || !degree || !field || !start_date || !description) {
+    return res.status(400).json({ message: 'Missing required fields' });
+  }
 
   try {
-    let education = (await get('education')) || [];
-    const index = education.findIndex(edu => edu.id === Number(id));
-
-    if (index === -1) {
-      return res.status(404).json({ message: 'Eğitim bulunamadı' });
-    }
-
-    education[index] = { ...education[index], school, degree, field, startDate, endDate, description };
-    await set('education', education);
+    // Eğitim bilgilerini güncelle
+    await updateEducation(Number(id), { school, degree, field, start_date, end_date, description });
 
     res.status(200).json({ message: 'Eğitim bilgisi güncellendi' });
   } catch (error) {
-    res.status(500).json({ message: 'Sunucu hatası: ' + error.message });
+    console.error('Error details:', error); // Log full error for debugging
+    res.status(500).json({
+      message: `Sunucu hatası: ${error.message}`,
+      requestBody: req.body,
+    });
   }
 });
 
