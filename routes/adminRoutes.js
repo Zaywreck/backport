@@ -321,25 +321,72 @@ router.delete('/projects/:id', async (req, res) => {
     res.status(500).json({ message: 'Sunucu hatası: ' + error.message });
   }
 });
+
+async function updateProject(id, updatedData) {
+  try {
+    const projectsJson = await get('projects');
+    const projects = typeof projectsJson === 'string' ? JSON.parse(projectsJson) : projectsJson;
+
+    if (!Array.isArray(projects)) {
+      throw new Error('Projects data is not an array');
+    }
+
+    const index = id - 1; // ID = index + 1 olduğundan, index = id - 1
+    if (index < 0 || index >= projects.length) {
+      throw new Error('Project not found');
+    }
+
+    projects[index] = { ...projects[index], ...updatedData };
+
+    const response = await fetch(
+      'https://api.vercel.com/v1/edge-config/ecfg_r5ttjeq5fpdwcyl7muoowf83nad1/items',
+      {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer 58W6mvFK9bVdAHyxRzAr0Aql`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          items: [
+            {
+              operation: 'update',
+              key: 'projects',
+              value: projects,
+            },
+          ],
+        }),
+      }
+    );
+
+    const result = await response.json();
+    console.log('Updated projects:', result);
+
+    return result;
+  } catch (error) {
+    console.error('Error updating project:', error);
+    throw new Error('Failed to update project');
+  }
+}
 // Project güncelleme
 router.put('/projects/:id', async (req, res) => {
   const { id } = req.params;
   const { title, description, imageUrl, projectUrl } = req.body;
 
+  if (!title || !description || !imageUrl || !projectUrl) {
+    return res.status(400).json({ message: 'Missing required fields' });
+  }
+
   try {
-    let projects = (await get('projects')) || [];
-    const index = projects.findIndex(proj => proj.id === Number(id));
-
-    if (index === -1) {
-      return res.status(404).json({ message: 'Proje bulunamadı' });
-    }
-
-    projects[index] = { ...projects[index], title, description, imageUrl, projectUrl };
-    await set('projects', projects);
+    // Proje bilgilerini güncelle
+    await updateProject(Number(id), { title, description, imageUrl, projectUrl });
 
     res.status(200).json({ message: 'Proje bilgisi güncellendi' });
   } catch (error) {
-    res.status(500).json({ message: 'Sunucu hatası: ' + error.message });
+    console.error('Error details:', error); // Log full error for debugging
+    res.status(500).json({
+      message: `Sunucu hatası: ${error.message}`,
+      requestBody: req.body,
+    });
   }
 });
 
