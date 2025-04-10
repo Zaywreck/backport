@@ -18,6 +18,10 @@ app.get('/', (req, res) => {
 
 // serve static files
 app.use(express.static('public'));
+// Middleware for serving static files
+app.use('/public', express.static('public'));
+// Middleware for serving pdf files
+app.use('/pdf', express.static('pdf'));
 
 // Routes
 app.use('/api/admin', adminRoutes);
