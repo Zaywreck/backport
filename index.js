@@ -16,8 +16,8 @@ app.get('/', (req, res) => {
   res.send('Welcome to the API powered by Vercel Edge Config 🚀');
 });
 
-// static files
-app.use('/static', express.static('static'));
+// serve static files
+app.use(express.static('public'));
 
 // Routes
 app.use('/api/admin', adminRoutes);
