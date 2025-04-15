@@ -1,6 +1,9 @@
 import express from 'express';
 import { get } from '@vercel/edge-config';
 
+const EDGE_CONFIG_URL = process.env.EDGE_CONFIG_URL;
+const API_TOKEN = process.env.VERCEL_API_TOKEN;
+
 const router = express.Router();
 
 // Get all blog posts
@@ -52,21 +55,46 @@ router.post('/:id/comments', async (req, res) => {
     blogs[blogIndex].comments = blogs[blogIndex].comments || [];
     blogs[blogIndex].comments.push(newComment);
 
-    // Update Edge Config
-    await fetch(process.env.EDGE_CONFIG_URL, {
-      method: 'PATCH',
-      headers: {
-        'Authorization': `Bearer ${process.env.EDGE_CONFIG_TOKEN}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ blogs }),
-    });
+    // Update Edge Config using the working patchEdgeConfig function
+    await patchEdgeConfig('blogs', blogs);
 
     res.status(201).json(newComment);
   } catch (error) {
     res.status(500).json({ error: 'Failed to add comment' });
   }
 });
+
+// Helper function to update Edge Config - using the same pattern that works in other routes
+async function patchEdgeConfig(key, value) {
+  try {
+    const response = await fetch(EDGE_CONFIG_URL, {
+      method: 'PATCH',
+      headers: {
+        Authorization: API_TOKEN,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        items: [
+          {
+            operation: 'update',
+            key,
+            value,
+          },
+        ],
+      }),
+    });
+
+    const result = await response.json();
+    if (!response.ok) {
+      throw new Error(`Edge Config update failed: ${result.message || 'Unknown error'}`);
+    }
+    console.log(`Updated ${key}:`, result);
+    return result;
+  } catch (error) {
+    console.error(`Error updating ${key}:`, error);
+    throw error;
+  }
+}
 
 // Toggle like on a blog post
 router.post('/:id/like', async (req, res) => {
@@ -92,15 +120,8 @@ router.post('/:id/like', async (req, res) => {
       blogs[blogIndex].likes.splice(likeIndex, 1);
     }
 
-    // Update Edge Config
-    await fetch(process.env.EDGE_CONFIG_URL, {
-      method: 'PATCH',
-      headers: {
-        'Authorization': `Bearer ${process.env.EDGE_CONFIG_TOKEN}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ blogs }),
-    });
+    // Update Edge Config using the working patchEdgeConfig function
+    await patchEdgeConfig('blogs', blogs);
 
     res.json({ likes: blogs[blogIndex].likes.length });
   } catch (error) {
