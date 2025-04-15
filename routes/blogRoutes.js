@@ -49,7 +49,8 @@ router.post('/:id/comments', async (req, res) => {
       id: Date.now().toString(),
       name,
       comment,
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
+      userId: req.body.userId || null // Store userId if provided
     };
 
     blogs[blogIndex].comments = blogs[blogIndex].comments || [];
@@ -126,6 +127,87 @@ router.post('/:id/like', async (req, res) => {
     res.json({ likes: blogs[blogIndex].likes.length });
   } catch (error) {
     res.status(500).json({ error: 'Failed to toggle like' });
+  }
+});
+
+// Update a comment
+router.put('/:blogId/comments/:commentId', async (req, res) => {
+  try {
+    const { blogId, commentId } = req.params;
+    const { comment, userId } = req.body;
+    
+    if (!comment) {
+      return res.status(400).json({ error: 'Comment text is required' });
+    }
+
+    const blogs = await get('blogs') || [];
+    const blogIndex = blogs.findIndex(b => b.id === blogId);
+    
+    if (blogIndex === -1) {
+      return res.status(404).json({ error: 'Blog post not found' });
+    }
+
+    // Find the comment
+    const commentIndex = blogs[blogIndex].comments?.findIndex(c => c.id === commentId);
+    if (commentIndex === -1 || commentIndex === undefined) {
+      return res.status(404).json({ error: 'Comment not found' });
+    }
+
+    // Check if the user is the author of the comment (by name or userId)
+    const commentAuthor = blogs[blogIndex].comments[commentIndex];
+    if (userId && commentAuthor.userId && commentAuthor.userId !== userId) {
+      return res.status(403).json({ error: 'You can only edit your own comments' });
+    }
+
+    // Update the comment
+    blogs[blogIndex].comments[commentIndex].comment = comment;
+    blogs[blogIndex].comments[commentIndex].updatedAt = new Date().toISOString();
+
+    // Update Edge Config
+    await patchEdgeConfig('blogs', blogs);
+
+    res.json(blogs[blogIndex].comments[commentIndex]);
+  } catch (error) {
+    console.error('Error updating comment:', error);
+    res.status(500).json({ error: 'Failed to update comment' });
+  }
+});
+
+// Delete a comment
+router.delete('/:blogId/comments/:commentId', async (req, res) => {
+  try {
+    const { blogId, commentId } = req.params;
+    const { userId } = req.body;
+
+    const blogs = await get('blogs') || [];
+    const blogIndex = blogs.findIndex(b => b.id === blogId);
+    
+    if (blogIndex === -1) {
+      return res.status(404).json({ error: 'Blog post not found' });
+    }
+
+    // Find the comment
+    const commentIndex = blogs[blogIndex].comments?.findIndex(c => c.id === commentId);
+    if (commentIndex === -1 || commentIndex === undefined) {
+      return res.status(404).json({ error: 'Comment not found' });
+    }
+
+    // Check if the user is the author of the comment (by name or userId)
+    const commentAuthor = blogs[blogIndex].comments[commentIndex];
+    if (userId && commentAuthor.userId && commentAuthor.userId !== userId) {
+      return res.status(403).json({ error: 'You can only delete your own comments' });
+    }
+
+    // Remove the comment
+    blogs[blogIndex].comments.splice(commentIndex, 1);
+
+    // Update Edge Config
+    await patchEdgeConfig('blogs', blogs);
+
+    res.json({ success: true, message: 'Comment deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting comment:', error);
+    res.status(500).json({ error: 'Failed to delete comment' });
   }
 });
 
