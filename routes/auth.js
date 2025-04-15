@@ -5,147 +5,49 @@ import jwt from 'jsonwebtoken';
 
 const router = express.Router();
 
-// Helper function to get users from Edge Config or fallback storage
+const EDGE_CONFIG_URL = process.env.EDGE_CONFIG_URL;
+const API_TOKEN = process.env.EDGE_CONFIG_TOKEN;
+
+// Helper function to get users from Edge Config
 async function getUsers() {
   try {
-    // Check if Edge Config environment variables are available
-    if (!process.env.EDGE_CONFIG_URL || !process.env.EDGE_CONFIG_TOKEN) {
-      console.warn('Edge Config environment variables not set. Using in-memory storage instead.');
-      return memoryStorage.users || [];
-    }
-
-    try {
-      // First try to get users with our custom key
-      const users = await get(EDGE_CONFIG_USER_KEY);
-      if (Array.isArray(users) && users.length > 0) {
-        console.log(`Found ${users.length} users using key: ${EDGE_CONFIG_USER_KEY}`);
-        return users;
-      }
-      
-      // If that fails, try to get users from the existing structure
-      try {
-        const existingUsers = await get('users');
-        if (existingUsers && existingUsers.list && Array.isArray(existingUsers.list)) {
-          console.log(`Found ${existingUsers.list.length} users in existing structure`);
-          return existingUsers.list;
-        }
-      } catch (existingStructureError) {
-        console.warn('Could not get users from existing structure:', existingStructureError);
-      }
-      
-      // If all else fails, return in-memory storage or empty array
-      console.log('No users found in Edge Config, using in-memory storage');
-      return memoryStorage.users || [];
-    } catch (edgeConfigError) {
-      console.warn('Error getting users from Edge Config:', edgeConfigError);
-      // Fallback to in-memory storage
-      return memoryStorage.users || [];
-    }
+    const users = await get('registeredUsers') || [];
+    return users;
   } catch (error) {
-    console.error('Error in getUsers function:', error);
+    console.error('Error getting users:', error);
     return [];
   }
 }
 
-// In-memory fallback storage when Edge Config is unavailable
-const memoryStorage = {
-  users: []
-};
-
-// Edge Config key for users - using 'appUsers' which should be compatible with Edge Config
-const EDGE_CONFIG_USER_KEY = 'appUsers';
-
-// Helper function to update Edge Config
-async function updateEdgeConfig(key, value) {
+// Helper function to update Edge Config - using the same pattern as in adminRoutes.js
+async function patchEdgeConfig(key, value) {
   try {
-    // Check if Edge Config environment variables are available
-    if (!process.env.EDGE_CONFIG_URL || !process.env.EDGE_CONFIG_TOKEN) {
-      console.warn('Edge Config environment variables not set. Using in-memory storage instead.');
-      memoryStorage[key] = value;
-      return;
-    }
+    const response = await fetch(EDGE_CONFIG_URL, {
+      method: 'PATCH',
+      headers: {
+        Authorization: `Bearer ${API_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        items: [
+          {
+            operation: 'update',
+            key,
+            value,
+          },
+        ],
+      }),
+    });
 
-    // Create a safe copy of the value to avoid circular reference issues
-    const safeValue = JSON.parse(JSON.stringify(value));
-    const requestBody = { [key]: safeValue };
-    
-    console.log(`Attempting to update Edge Config for key: ${key}`);
-    
-    try {
-      // First try to get the current Edge Config to see what properties are allowed
-      const getResponse = await fetch(process.env.EDGE_CONFIG_URL, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${process.env.EDGE_CONFIG_TOKEN}`,
-        },
-      });
-      
-      if (getResponse.ok) {
-        const currentConfig = await getResponse.json();
-        console.log('Current Edge Config keys:', Object.keys(currentConfig));
-        
-        // Check if we're trying to update an existing property
-        if (key in currentConfig) {
-          console.log(`Key '${key}' exists in Edge Config, updating...`);
-        } else {
-          console.log(`Key '${key}' does not exist in Edge Config, will attempt to create it...`);
-        }
-      }
-      
-      // Now try to update Edge Config
-      const response = await fetch(process.env.EDGE_CONFIG_URL, {
-        method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${process.env.EDGE_CONFIG_TOKEN}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestBody),
-      });
-
-      if (!response.ok) {
-        const responseText = await response.text().catch(() => 'No response text');
-        console.warn(`Failed to update Edge Config: ${response.status} ${response.statusText}`);
-        console.warn(`Response body: ${responseText}`);
-        console.warn(`Request body was: ${JSON.stringify(requestBody)}`);
-        
-        // Try alternative approach - update the 'users' property directly
-        if (key === EDGE_CONFIG_USER_KEY) {
-          console.log('Trying to update using existing database structure...');
-          
-          // Try to update using the 'users' property from your existing database
-          const altResponse = await fetch(process.env.EDGE_CONFIG_URL, {
-            method: 'PATCH',
-            headers: {
-              'Authorization': `Bearer ${process.env.EDGE_CONFIG_TOKEN}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ users: { list: safeValue } }),
-          });
-          
-          if (altResponse.ok) {
-            console.log('Successfully updated Edge Config using alternative approach');
-            return;
-          } else {
-            const altResponseText = await altResponse.text().catch(() => 'No response text');
-            console.warn(`Alternative approach also failed: ${altResponse.status} ${altResponse.statusText}`);
-            console.warn(`Response body: ${altResponseText}`);
-          }
-        }
-        
-        // Fallback to in-memory storage
-        console.log('Using in-memory storage fallback');
-        memoryStorage[key] = value;
-      } else {
-        console.log(`Successfully updated Edge Config for key: ${key}`);
-      }
-    } catch (fetchError) {
-      console.error('Edge Config fetch error:', fetchError);
-      memoryStorage[key] = value;
+    const result = await response.json();
+    if (!response.ok) {
+      throw new Error(`Edge Config update failed: ${result.message || 'Unknown error'}`);
     }
+    console.log(`Updated ${key}:`, result);
+    return result;
   } catch (error) {
-    console.error('Edge Config update error:', error);
-    // Fallback to in-memory storage
-    memoryStorage[key] = value;
+    console.error(`Error updating ${key}:`, error);
+    throw error;
   }
 }
 // Middleware to verify JWT token
@@ -198,12 +100,11 @@ router.post('/register', async (req, res) => {
     console.log(`Updating users array with new user. Total users: ${updatedUsers.length}`);
     
     try {
-      // Use the Edge Config compatible key
-      await updateEdgeConfig(EDGE_CONFIG_USER_KEY, updatedUsers);
+      // Update the registeredUsers collection in Edge Config
+      await patchEdgeConfig('registeredUsers', updatedUsers);
     } catch (updateError) {
       console.error('Failed to update Edge Config:', updateError);
-      // Even if Edge Config update fails, we'll still return success
-      // since the user is stored in memory
+      return res.status(500).json({ message: 'Error saving user to database' });
     }
 
     const { password: _, ...userWithoutPassword } = newUser;
