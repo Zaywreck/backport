@@ -1,7 +1,11 @@
-const express = require('express');
-const { get } = require('@vercel/edge-config');
+import express from 'express';
+import { get } from '@vercel/edge-config';
+import isAdmin from '../middleware/adminAuth.js';
 
 const router = express.Router();
+
+// Apply admin middleware to all routes
+router.use(isAdmin);
 
 const EDGE_CONFIG_URL = process.env.EDGE_CONFIG_URL;
 const API_TOKEN = process.env.VERCEL_API_TOKEN;
@@ -420,4 +424,4 @@ router.put('/projects/:id', async (req, res) => {
   }
 });
 
-module.exports = router;
+export default router;
