@@ -15,7 +15,8 @@ async function getUsers() {
     }
 
     try {
-      const users = await get('users');
+      // Try to get users with the Edge Config compatible key
+      const users = await get(EDGE_CONFIG_USER_KEY);
       // Ensure users is always an array
       return Array.isArray(users) ? users : memoryStorage.users || [];
     } catch (edgeConfigError) {
@@ -33,6 +34,9 @@ async function getUsers() {
 const memoryStorage = {
   users: []
 };
+
+// Edge Config key for users (Edge Config doesn't accept 'users' as a property name)
+const EDGE_CONFIG_USER_KEY = 'usersList';
 
 // Helper function to update Edge Config
 async function updateEdgeConfig(key, value) {
@@ -132,7 +136,8 @@ router.post('/register', async (req, res) => {
     console.log(`Updating users array with new user. Total users: ${updatedUsers.length}`);
     
     try {
-      await updateEdgeConfig('users', updatedUsers);
+      // Use the Edge Config compatible key
+      await updateEdgeConfig(EDGE_CONFIG_USER_KEY, updatedUsers);
     } catch (updateError) {
       console.error('Failed to update Edge Config:', updateError);
       // Even if Edge Config update fails, we'll still return success
@@ -147,9 +152,10 @@ router.post('/register', async (req, res) => {
   }
 });
 
-// Login
+// User Login
 router.post('/login', async (req, res) => {
   try {
+    console.log('User login attempt:', { email: req.body.email });
     const { email, password } = req.body;
 
     if (!email || !password) {
@@ -164,6 +170,11 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ message: 'Invalid email or password' });
     }
 
+    // For regular user login, check that the role is 'user'
+    if (user.role !== 'user') {
+      return res.status(403).json({ message: 'This login is for regular users only' });
+    }
+
     const token = jwt.sign(
       { userId: user.id, email: user.email, role: user.role },
       process.env.JWT_SECRET || 'your-secret-key',
@@ -176,7 +187,47 @@ router.post('/login', async (req, res) => {
       token
     });
   } catch (error) {
-    console.error('Login error:', error);
+    console.error('User login error:', error);
+    res.status(500).json({ message: 'Server error: ' + error.message });
+  }
+});
+
+// Admin Login
+router.post('/admin/login', async (req, res) => {
+  try {
+    console.log('Admin login attempt:', { email: req.body.email });
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({ message: 'Email and password are required' });
+    }
+
+    const users = await getUsers();
+    // Ensure users is an array before using find
+    const user = Array.isArray(users) ? users.find(u => u && u.email === email) : null;
+
+    if (!user || !(await bcrypt.compare(password, user.password))) {
+      return res.status(401).json({ message: 'Invalid email or password' });
+    }
+
+    // For admin login, check that the role is 'admin'
+    if (user.role !== 'admin') {
+      return res.status(403).json({ message: 'Admin access required' });
+    }
+
+    const token = jwt.sign(
+      { userId: user.id, email: user.email, role: user.role },
+      process.env.JWT_SECRET || 'your-secret-key',
+      { expiresIn: '24h' }
+    );
+
+    const { password: _, ...userWithoutPassword } = user;
+    res.json({
+      user: userWithoutPassword,
+      token
+    });
+  } catch (error) {
+    console.error('Admin login error:', error);
     res.status(500).json({ message: 'Server error: ' + error.message });
   }
 });
