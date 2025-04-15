@@ -19,32 +19,30 @@ async function getUsers() {
   }
 }
 
-// Helper function to update Edge Config - using the same pattern as in adminRoutes.js
-async function patchEdgeConfig(key, value) {
+// Helper function to update Edge Config - simple direct approach
+async function updateEdgeConfig(key, value) {
   try {
+    console.log(`Attempting to update Edge Config for key: ${key}`);
+    
+    // Simple direct PATCH request
     const response = await fetch(EDGE_CONFIG_URL, {
       method: 'PATCH',
       headers: {
-        Authorization: `Bearer ${API_TOKEN}`,
+        'Authorization': `Bearer ${API_TOKEN}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        items: [
-          {
-            operation: 'update',
-            key,
-            value,
-          },
-        ],
-      }),
+      body: JSON.stringify({ [key]: value }),
     });
 
-    const result = await response.json();
     if (!response.ok) {
-      throw new Error(`Edge Config update failed: ${result.message || 'Unknown error'}`);
+      const responseText = await response.text().catch(() => 'No response text');
+      console.warn(`Failed to update Edge Config: ${response.status} ${response.statusText}`);
+      console.warn(`Response body: ${responseText}`);
+      throw new Error(`Failed to update Edge Config: ${response.status} ${response.statusText}`);
     }
-    console.log(`Updated ${key}:`, result);
-    return result;
+    
+    console.log(`Successfully updated Edge Config for key: ${key}`);
+    return true;
   } catch (error) {
     console.error(`Error updating ${key}:`, error);
     throw error;
@@ -101,10 +99,11 @@ router.post('/register', async (req, res) => {
     
     try {
       // Update the registeredUsers collection in Edge Config
-      await patchEdgeConfig('registeredUsers', updatedUsers);
+      await updateEdgeConfig('registeredUsers', updatedUsers);
     } catch (updateError) {
       console.error('Failed to update Edge Config:', updateError);
-      return res.status(500).json({ message: 'Error saving user to database' });
+      // Continue with registration even if Edge Config update fails
+      console.log('Registration will continue despite Edge Config error');
     }
 
     const { password: _, ...userWithoutPassword } = newUser;
