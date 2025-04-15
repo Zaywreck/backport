@@ -5,21 +5,45 @@ import jwt from 'jsonwebtoken';
 
 const router = express.Router();
 
-// Helper function to get users from Edge Config
+// Helper function to get users from Edge Config or fallback storage
 async function getUsers() {
   try {
-    const users = await get('users');
-    // Ensure users is always an array
-    return Array.isArray(users) ? users : [];
+    // Check if Edge Config environment variables are available
+    if (!process.env.EDGE_CONFIG_URL || !process.env.EDGE_CONFIG_TOKEN) {
+      console.warn('Edge Config environment variables not set. Using in-memory storage instead.');
+      return memoryStorage.users || [];
+    }
+
+    try {
+      const users = await get('users');
+      // Ensure users is always an array
+      return Array.isArray(users) ? users : memoryStorage.users || [];
+    } catch (edgeConfigError) {
+      console.warn('Error getting users from Edge Config:', edgeConfigError);
+      // Fallback to in-memory storage
+      return memoryStorage.users || [];
+    }
   } catch (error) {
-    console.error('Error getting users:', error);
+    console.error('Error in getUsers function:', error);
     return [];
   }
 }
 
+// In-memory fallback storage when Edge Config is unavailable
+const memoryStorage = {
+  users: []
+};
+
 // Helper function to update Edge Config
 async function updateEdgeConfig(key, value) {
   try {
+    // Check if Edge Config environment variables are available
+    if (!process.env.EDGE_CONFIG_URL || !process.env.EDGE_CONFIG_TOKEN) {
+      console.warn('Edge Config environment variables not set. Using in-memory storage instead.');
+      memoryStorage[key] = value;
+      return;
+    }
+
     const response = await fetch(process.env.EDGE_CONFIG_URL, {
       method: 'PATCH',
       headers: {
@@ -30,10 +54,14 @@ async function updateEdgeConfig(key, value) {
     });
 
     if (!response.ok) {
-      throw new Error('Failed to update Edge Config');
+      console.warn(`Failed to update Edge Config: ${response.status} ${response.statusText}`);
+      // Fallback to in-memory storage
+      memoryStorage[key] = value;
     }
   } catch (error) {
-    throw error;
+    console.error('Edge Config update error:', error);
+    // Fallback to in-memory storage
+    memoryStorage[key] = value;
   }
 }
 // Middleware to verify JWT token
