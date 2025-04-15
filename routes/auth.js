@@ -44,18 +44,36 @@ async function updateEdgeConfig(key, value) {
       return;
     }
 
-    const response = await fetch(process.env.EDGE_CONFIG_URL, {
-      method: 'PATCH',
-      headers: {
-        'Authorization': `Bearer ${process.env.EDGE_CONFIG_TOKEN}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ [key]: value }),
-    });
+    // Create a safe copy of the value to avoid circular reference issues
+    const safeValue = JSON.parse(JSON.stringify(value));
+    const requestBody = { [key]: safeValue };
+    
+    console.log(`Attempting to update Edge Config for key: ${key}`);
+    
+    try {
+      const response = await fetch(process.env.EDGE_CONFIG_URL, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${process.env.EDGE_CONFIG_TOKEN}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody),
+      });
 
-    if (!response.ok) {
-      console.warn(`Failed to update Edge Config: ${response.status} ${response.statusText}`);
-      // Fallback to in-memory storage
+      if (!response.ok) {
+        const responseText = await response.text().catch(() => 'No response text');
+        console.warn(`Failed to update Edge Config: ${response.status} ${response.statusText}`);
+        console.warn(`Response body: ${responseText}`);
+        console.warn(`Request body was: ${JSON.stringify(requestBody)}`);
+        
+        // Fallback to in-memory storage
+        console.log('Using in-memory storage fallback');
+        memoryStorage[key] = value;
+      } else {
+        console.log(`Successfully updated Edge Config for key: ${key}`);
+      }
+    } catch (fetchError) {
+      console.error('Edge Config fetch error:', fetchError);
       memoryStorage[key] = value;
     }
   } catch (error) {
@@ -83,6 +101,7 @@ const verifyToken = (req, res, next) => {
 // Register new user
 router.post('/register', async (req, res) => {
   try {
+    console.log('Registration attempt:', { email: req.body.email });
     const { email, password, name } = req.body;
 
     if (!email || !password || !name) {
@@ -90,6 +109,8 @@ router.post('/register', async (req, res) => {
     }
 
     const users = await getUsers();
+    console.log(`Retrieved ${Array.isArray(users) ? users.length : 'non-array'} users`);
+    
     // Check if email already exists, using a safer approach
     const emailExists = Array.isArray(users) && users.some(user => user && user.email === email);
     if (emailExists) {
@@ -106,8 +127,17 @@ router.post('/register', async (req, res) => {
       createdAt: new Date().toISOString()
     };
 
-    users.push(newUser);
-    await updateEdgeConfig('users', users);
+    // Create a new array to avoid potential reference issues
+    const updatedUsers = Array.isArray(users) ? [...users, newUser] : [newUser];
+    console.log(`Updating users array with new user. Total users: ${updatedUsers.length}`);
+    
+    try {
+      await updateEdgeConfig('users', updatedUsers);
+    } catch (updateError) {
+      console.error('Failed to update Edge Config:', updateError);
+      // Even if Edge Config update fails, we'll still return success
+      // since the user is stored in memory
+    }
 
     const { password: _, ...userWithoutPassword } = newUser;
     res.status(201).json(userWithoutPassword);
