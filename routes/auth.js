@@ -8,8 +8,9 @@ const router = express.Router();
 // Helper function to get users from Edge Config
 async function getUsers() {
   try {
-    const users = await get('users') || [];
-    return users;
+    const users = await get('users');
+    // Ensure users is always an array
+    return Array.isArray(users) ? users : [];
   } catch (error) {
     console.error('Error getting users:', error);
     return [];
@@ -61,7 +62,9 @@ router.post('/register', async (req, res) => {
     }
 
     const users = await getUsers();
-    if (users.some(user => user.email === email)) {
+    // Check if email already exists, using a safer approach
+    const emailExists = Array.isArray(users) && users.some(user => user && user.email === email);
+    if (emailExists) {
       return res.status(400).json({ message: 'Email already exists' });
     }
 
@@ -96,7 +99,8 @@ router.post('/login', async (req, res) => {
     }
 
     const users = await getUsers();
-    const user = users.find(u => u.email === email);
+    // Ensure users is an array before using find
+    const user = Array.isArray(users) ? users.find(u => u && u.email === email) : null;
 
     if (!user || !(await bcrypt.compare(password, user.password))) {
       return res.status(401).json({ message: 'Invalid email or password' });
@@ -123,7 +127,8 @@ router.post('/login', async (req, res) => {
 router.get('/me', verifyToken, async (req, res) => {
   try {
     const users = await getUsers();
-    const user = users.find(u => u.id === req.user.userId);
+    // Ensure users is an array before using find
+    const user = Array.isArray(users) ? users.find(u => u && u.id === req.user.userId) : null;
 
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
@@ -141,7 +146,8 @@ router.put('/me', verifyToken, async (req, res) => {
   try {
     const { name, currentPassword, newPassword } = req.body;
     const users = await getUsers();
-    const userIndex = users.findIndex(u => u.id === req.user.userId);
+    // Ensure users is an array before using findIndex
+    const userIndex = Array.isArray(users) ? users.findIndex(u => u && u.id === req.user.userId) : -1;
 
     if (userIndex === -1) {
       return res.status(404).json({ message: 'User not found' });
