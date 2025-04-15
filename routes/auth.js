@@ -11,7 +11,7 @@ const API_TOKEN = process.env.EDGE_CONFIG_TOKEN;
 // Helper function to get users from Edge Config
 async function getUsers() {
   try {
-    const users = await get('registeredUsers') || [];
+    const users = await get('users') || [];
     return users;
   } catch (error) {
     console.error('Error getting users:', error);
@@ -98,8 +98,8 @@ router.post('/register', async (req, res) => {
     console.log(`Updating users array with new user. Total users: ${updatedUsers.length}`);
     
     try {
-      // Update the registeredUsers collection in Edge Config
-      await updateEdgeConfig('registeredUsers', updatedUsers);
+      // Update the users array in Edge Config
+      await updateEdgeConfig('users', updatedUsers);
     } catch (updateError) {
       console.error('Failed to update Edge Config:', updateError);
       // Continue with registration even if Edge Config update fails
