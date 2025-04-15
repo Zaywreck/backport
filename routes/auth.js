@@ -6,7 +6,7 @@ import jwt from 'jsonwebtoken';
 const router = express.Router();
 
 const EDGE_CONFIG_URL = process.env.EDGE_CONFIG_URL;
-const API_TOKEN = process.env.EDGE_CONFIG_TOKEN;
+const API_TOKEN = process.env.VERCEL_API_TOKEN;
 
 // Helper function to get users from Edge Config
 async function getUsers() {
@@ -19,30 +19,32 @@ async function getUsers() {
   }
 }
 
-// Helper function to update Edge Config - simple direct approach
-async function updateEdgeConfig(key, value) {
+// Helper function to update Edge Config - using the working version from adminRoutes.js
+async function patchEdgeConfig(key, value) {
   try {
-    console.log(`Attempting to update Edge Config for key: ${key}`);
-    
-    // Simple direct PATCH request
     const response = await fetch(EDGE_CONFIG_URL, {
       method: 'PATCH',
       headers: {
-        'Authorization': `Bearer ${API_TOKEN}`,
+        Authorization: API_TOKEN,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ [key]: value }),
+      body: JSON.stringify({
+        items: [
+          {
+            operation: 'update',
+            key,
+            value,
+          },
+        ],
+      }),
     });
 
+    const result = await response.json();
     if (!response.ok) {
-      const responseText = await response.text().catch(() => 'No response text');
-      console.warn(`Failed to update Edge Config: ${response.status} ${response.statusText}`);
-      console.warn(`Response body: ${responseText}`);
-      throw new Error(`Failed to update Edge Config: ${response.status} ${response.statusText}`);
+      throw new Error(`Edge Config update failed: ${result.message || 'Unknown error'}`);
     }
-    
-    console.log(`Successfully updated Edge Config for key: ${key}`);
-    return true;
+    console.log(`Updated ${key}:`, result);
+    return result;
   } catch (error) {
     console.error(`Error updating ${key}:`, error);
     throw error;
@@ -99,7 +101,7 @@ router.post('/register', async (req, res) => {
     
     try {
       // Update the users array in Edge Config
-      await updateEdgeConfig('users', updatedUsers);
+      await patchEdgeConfig('users', updatedUsers);
     } catch (updateError) {
       console.error('Failed to update Edge Config:', updateError);
       // Continue with registration even if Edge Config update fails
