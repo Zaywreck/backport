@@ -9,8 +9,7 @@ import path from 'path';
 import csurf from 'csurf';
 import cookieParser from 'cookie-parser';
 import slugify from 'slugify';
-import { get } from '@vercel/edge-config';
-import { patchEdgeConfig } from './routes/adminRoutes.js'; // Make sure patchEdgeConfig is exported from adminRoutes.js
+import { patchEdgeConfig, getEdgeConfig } from './utils/edgeConfig.js';
 
 const app = express();
 
@@ -33,11 +32,12 @@ app.use(express.json());
 // Increment visitor count and return value
 app.post('/api/visitors/increment', async (req, res) => {
   try {
-    let stats = (await get('stats')) || {};
+    let stats = (await getEdgeConfig('stats')) || {};
     stats.visitors = (parseInt(stats.visitors) || 0) + 1;
     await patchEdgeConfig('stats', stats);
     res.json({ visitors: stats.visitors });
   } catch (e) {
+    console.error('Error incrementing visitors:', e);
     res.status(500).json({ error: 'Failed to increment visitors' });
   }
 });
@@ -45,9 +45,10 @@ app.post('/api/visitors/increment', async (req, res) => {
 // Get visitor count
 app.get('/api/visitors', async (req, res) => {
   try {
-    let stats = (await get('stats')) || {};
+    let stats = (await getEdgeConfig('stats')) || {};
     res.json({ visitors: parseInt(stats.visitors) || 0 });
   } catch (e) {
+    console.error('Error getting visitors:', e);
     res.status(500).json({ error: 'Failed to get visitors' });
   }
 });
@@ -55,7 +56,7 @@ app.get('/api/visitors', async (req, res) => {
 // Online user ping (add a timestamp to the online array)
 app.post('/api/online/ping', async (req, res) => {
   try {
-    let stats = (await get('stats')) || {};
+    let stats = (await getEdgeConfig('stats')) || {};
     let online = stats.online || [];
     const now = Date.now();
     online.push({ time: now });
@@ -65,6 +66,7 @@ app.post('/api/online/ping', async (req, res) => {
     await patchEdgeConfig('stats', stats);
     res.json({ online: online.length });
   } catch (e) {
+    console.error('Error updating online users:', e);
     res.status(500).json({ error: 'Failed to update online users' });
   }
 });
@@ -72,12 +74,13 @@ app.post('/api/online/ping', async (req, res) => {
 // Get online user count
 app.get('/api/online', async (req, res) => {
   try {
-    let stats = (await get('stats')) || {};
+    let stats = (await getEdgeConfig('stats')) || {};
     let online = stats.online || [];
     const now = Date.now();
     online = online.filter(v => v.time > now - 5 * 60 * 1000);
     res.json({ online: online.length });
   } catch (e) {
+    console.error('Error getting online users:', e);
     res.status(500).json({ error: 'Failed to get online users' });
   }
 });
@@ -93,7 +96,7 @@ app.get('/sitemap.xml', async (req, res) => {
   // Get blog slugs from Edge Config
   let blogSlugs = [];
   try {
-    const blogs = (await get('blogs')) || [];
+    const blogs = (await getEdgeConfig('blogs')) || [];
     blogSlugs = blogs.map(b => `/blog/${b.slug || b.id}`);
   } catch (e) { 
     console.error('Error fetching blogs for sitemap:', e);
