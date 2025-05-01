@@ -1,19 +1,51 @@
 import express from 'express';
+import { get } from '@vercel/edge-config';
 import isAdmin from '../middleware/adminAuth.js';
-import slugify from 'slugify';
-import { patchEdgeConfig, getEdgeConfig } from '../utils/edgeConfig.js';
 
 const router = express.Router();
 
 // Apply admin middleware to all routes
 router.use(isAdmin);
 
-// Using patchEdgeConfig from utils/edgeConfig.js
+const EDGE_CONFIG_URL = process.env.EDGE_CONFIG_URL;
+const API_TOKEN = process.env.VERCEL_API_TOKEN;
+
+// Helper function to update Edge Config
+async function patchEdgeConfig(key, value) {
+  try {
+    const response = await fetch(EDGE_CONFIG_URL, {
+      method: 'PATCH',
+      headers: {
+        Authorization: API_TOKEN,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        items: [
+          {
+            operation: 'update',
+            key,
+            value,
+          },
+        ],
+      }),
+    });
+
+    const result = await response.json();
+    if (!response.ok) {
+      throw new Error(`Edge Config update failed: ${result.message || 'Unknown error'}`);
+    }
+    console.log(`Updated ${key}:`, result);
+    return result;
+  } catch (error) {
+    console.error(`Error updating ${key}:`, error);
+    throw error;
+  }
+}
 // ===================== Blogs =====================
 // Blogları Listele
 router.get('/blogs', async (req, res) => {
   try {
-    const blogs = (await getEdgeConfig('blogs')) || [];
+    const blogs = (await get('blogs')) || [];
     res.json(blogs);
   } catch (error) {
     res.status(500).json({ message: 'Sunucu hatası: ' + error.message });
@@ -25,19 +57,8 @@ router.post('/blogs', async (req, res) => {
   const { title, content, date, author } = req.body;
 
   try {
-    let blogs = (await getEdgeConfig('blogs')) || [];
+    let blogs = (await get('blogs')) || [];
     const newId = blogs.length > 0 ? Math.max(...blogs.map(blog => Number(blog.id))) + 1 : 1;
-    
-    // Generate slug from title
-    const slug = slugify(title, { lower: true, strict: true, locale: 'tr' });
-    
-    // Check if slug already exists and make it unique if needed
-    let finalSlug = slug;
-    let counter = 1;
-    while (blogs.some(blog => blog.slug === finalSlug)) {
-      finalSlug = `${slug}-${counter}`;
-      counter++;
-    }
 
     const newBlog = {
       id: newId.toString(),
@@ -45,7 +66,6 @@ router.post('/blogs', async (req, res) => {
       content,
       date,
       author,
-      slug: finalSlug,
     };
 
     blogs.push(newBlog);
@@ -62,7 +82,7 @@ router.delete('/blogs/:id', async (req, res) => {
   const { id } = req.params;
 
   try {
-    let blogs = (await getEdgeConfig('blogs')) || [];
+    let blogs = (await get('blogs')) || [];
     const filteredBlogs = blogs.filter(blog => blog.id !== id);
 
     if (filteredBlogs.length === blogs.length) {
@@ -79,26 +99,11 @@ router.delete('/blogs/:id', async (req, res) => {
 // Blog Güncelleme
 async function updateBlog(id, updatedData) {
   try {
-    let blogs = (await getEdgeConfig('blogs')) || [];
+    let blogs = (await get('blogs')) || [];
     const index = blogs.findIndex(blog => blog.id === id);
 
     if (index === -1) {
       throw new Error('Blog not found');
-    }
-    
-    // If title is being updated, regenerate the slug
-    if (updatedData.title && updatedData.title !== blogs[index].title) {
-      const slug = slugify(updatedData.title, { lower: true, strict: true, locale: 'tr' });
-      
-      // Check if slug already exists and make it unique if needed
-      let finalSlug = slug;
-      let counter = 1;
-      while (blogs.some((blog, i) => i !== index && blog.slug === finalSlug)) {
-        finalSlug = `${slug}-${counter}`;
-        counter++;
-      }
-      
-      updatedData.slug = finalSlug;
     }
 
     blogs[index] = { ...blogs[index], ...updatedData };
@@ -132,7 +137,7 @@ router.put('/blogs/:id', async (req, res) => {
 // Experience Bilgilerini Listele
 router.get('/experience', async (req, res) => {
   try {
-    const experiences = (await getEdgeConfig('experiences')) || [];
+    const experiences = (await get('experiences')) || [];
     res.json(experiences);
   } catch (error) {
     res.status(500).json({ message: 'Sunucu hatası: ' + error.message });
@@ -144,7 +149,7 @@ router.post('/experience', async (req, res) => {
   const { title, company, start_date, end_date, description } = req.body;
 
   try {
-    let experiences = (await getEdgeConfig('experiences')) || [];
+    let experiences = (await get('experiences')) || [];
     const newId = experiences.length > 0 ? Math.max(...experiences.map(exp => Number(exp.id))) + 1 : 1;
 
     const newExperience = {
@@ -170,7 +175,7 @@ router.delete('/experience/:id', async (req, res) => {
   const { id } = req.params;
 
   try {
-    let experiences = (await getEdgeConfig('experiences')) || [];
+    let experiences = (await get('experiences')) || [];
     const filteredExperiences = experiences.filter(exp => exp.id !== id);
 
     if (filteredExperiences.length === experiences.length) {
@@ -187,7 +192,7 @@ router.delete('/experience/:id', async (req, res) => {
 // Experience Güncelleme
 async function updateExperience(id, updatedData) {
   try {
-    let experiences = (await getEdgeConfig('experiences')) || [];
+    let experiences = (await get('experiences')) || [];
     const index = experiences.findIndex(exp => exp.id === id);
 
     if (index === -1) {
@@ -229,7 +234,7 @@ router.put('/experience/:id', async (req, res) => {
 // Education Bilgilerini Listele
 router.get('/education', async (req, res) => {
   try {
-    const education = (await getEdgeConfig('education')) || [];
+    const education = (await get('education')) || [];
     res.json(education);
   } catch (error) {
     res.status(500).json({ message: 'Sunucu hatası: ' + error.message });
@@ -241,7 +246,7 @@ router.post('/education', async (req, res) => {
   const { school, degree, field, startDate, endDate, description } = req.body;
 
   try {
-    let education = (await getEdgeConfig('education')) || [];
+    let education = (await get('education')) || [];
     const newId = education.length > 0 ? Math.max(...education.map(edu => Number(edu.id))) + 1 : 1;
 
     const newEducation = {
@@ -269,7 +274,7 @@ router.delete('/education/:id', async (req, res) => {
   const { id } = req.params;
 
   try {
-    let education = (await getEdgeConfig('education')) || [];
+    let education = (await get('education')) || [];
     const filteredEducation = education.filter(edu => edu.id !== id);
 
     if (filteredEducation.length === education.length) {
@@ -286,7 +291,7 @@ router.delete('/education/:id', async (req, res) => {
 // Education Güncelleme
 async function updateEducation(id, updatedData) {
   try {
-    let education = (await getEdgeConfig('education')) || [];
+    let education = (await get('education')) || [];
     const index = education.findIndex(edu => edu.id === id);
 
     if (index === -1) {
@@ -328,7 +333,7 @@ router.put('/education/:id', async (req, res) => {
 // Projects Bilgilerini Listele
 router.get('/projects', async (req, res) => {
   try {
-    const projects = (await getEdgeConfig('projects')) || [];
+    const projects = (await get('projects')) || [];
     res.json(projects);
   } catch (error) {
     res.status(500).json({ message: 'Sunucu hatası: ' + error.message });
@@ -340,7 +345,7 @@ router.post('/projects', async (req, res) => {
   const { title, description, imageUrl, projectUrl } = req.body;
 
   try {
-    let projects = (await getEdgeConfig('projects')) || [];
+    let projects = (await get('projects')) || [];
     const newId = projects.length > 0 ? Math.max(...projects.map(proj => Number(proj.id))) + 1 : 1;
 
     const newProject = {
@@ -365,7 +370,7 @@ router.delete('/projects/:id', async (req, res) => {
   const { id } = req.params;
 
   try {
-    let projects = (await getEdgeConfig('projects')) || [];
+    let projects = (await get('projects')) || [];
     const filteredProjects = projects.filter(proj => proj.id !== id);
 
     if (filteredProjects.length === projects.length) {
@@ -382,7 +387,7 @@ router.delete('/projects/:id', async (req, res) => {
 // Project Güncelleme
 async function updateProject(id, updatedData) {
   try {
-    let projects = (await getEdgeConfig('projects')) || [];
+    let projects = (await get('projects')) || [];
     const index = projects.findIndex(proj => proj.id === id);
 
     if (index === -1) {
