@@ -1,6 +1,7 @@
 import express from 'express';
 import { get } from '@vercel/edge-config';
 import isAdmin from '../middleware/adminAuth.js';
+import slugify from 'slugify';
 
 const router = express.Router();
 
@@ -11,7 +12,7 @@ const EDGE_CONFIG_URL = process.env.EDGE_CONFIG_URL;
 const API_TOKEN = process.env.VERCEL_API_TOKEN;
 
 // Helper function to update Edge Config
-async function patchEdgeConfig(key, value) {
+export async function patchEdgeConfig(key, value) {
   try {
     const response = await fetch(EDGE_CONFIG_URL, {
       method: 'PATCH',
@@ -59,6 +60,17 @@ router.post('/blogs', async (req, res) => {
   try {
     let blogs = (await get('blogs')) || [];
     const newId = blogs.length > 0 ? Math.max(...blogs.map(blog => Number(blog.id))) + 1 : 1;
+    
+    // Generate slug from title
+    const slug = slugify(title, { lower: true, strict: true, locale: 'tr' });
+    
+    // Check if slug already exists and make it unique if needed
+    let finalSlug = slug;
+    let counter = 1;
+    while (blogs.some(blog => blog.slug === finalSlug)) {
+      finalSlug = `${slug}-${counter}`;
+      counter++;
+    }
 
     const newBlog = {
       id: newId.toString(),
@@ -66,6 +78,7 @@ router.post('/blogs', async (req, res) => {
       content,
       date,
       author,
+      slug: finalSlug,
     };
 
     blogs.push(newBlog);
@@ -104,6 +117,21 @@ async function updateBlog(id, updatedData) {
 
     if (index === -1) {
       throw new Error('Blog not found');
+    }
+    
+    // If title is being updated, regenerate the slug
+    if (updatedData.title && updatedData.title !== blogs[index].title) {
+      const slug = slugify(updatedData.title, { lower: true, strict: true, locale: 'tr' });
+      
+      // Check if slug already exists and make it unique if needed
+      let finalSlug = slug;
+      let counter = 1;
+      while (blogs.some((blog, i) => i !== index && blog.slug === finalSlug)) {
+        finalSlug = `${slug}-${counter}`;
+        counter++;
+      }
+      
+      updatedData.slug = finalSlug;
     }
 
     blogs[index] = { ...blogs[index], ...updatedData };

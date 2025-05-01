@@ -9,6 +9,8 @@ import path from 'path';
 import csurf from 'csurf';
 import cookieParser from 'cookie-parser';
 import slugify from 'slugify';
+import { get } from '@vercel/edge-config';
+import { patchEdgeConfig } from './routes/adminRoutes.js'; // Make sure patchEdgeConfig is exported from adminRoutes.js
 
 const app = express();
 
@@ -25,24 +27,62 @@ app.use(cors({
 // JSON verileri almak için middleware
 app.use(express.json());
 
-// --- Visitor & Online Counter State (in-memory for demo) ---
-let visitorCount = 0;
-let recentVisitors = [];
+// --- Persistent Visitor & Online Counter with Edge Config ---
+// No in-memory state. All data is stored in Edge Config.
 
-// --- Visitor Middleware ---
-app.use((req, res, next) => {
-  // Only count page visits (not API calls except /, /api/visitors, /api/online)
-  if (req.method === 'GET' && !req.path.startsWith('/api')) {
-    visitorCount++;
-    // Track IP and timestamp for online count
-    const ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
-    recentVisitors.push({ ip, time: Date.now() });
-    // Clean up old entries (older than 5 min)
-    const fiveMinAgo = Date.now() - 5 * 60 * 1000;
-    recentVisitors = recentVisitors.filter(v => v.time > fiveMinAgo);
+// Increment visitor count and return value
+app.post('/api/visitors/increment', async (req, res) => {
+  try {
+    let stats = (await get('stats')) || {};
+    stats.visitors = (parseInt(stats.visitors) || 0) + 1;
+    await patchEdgeConfig('stats', stats);
+    res.json({ visitors: stats.visitors });
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to increment visitors' });
   }
-  next();
 });
+
+// Get visitor count
+app.get('/api/visitors', async (req, res) => {
+  try {
+    let stats = (await get('stats')) || {};
+    res.json({ visitors: parseInt(stats.visitors) || 0 });
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to get visitors' });
+  }
+});
+
+// Online user ping (add a timestamp to the online array)
+app.post('/api/online/ping', async (req, res) => {
+  try {
+    let stats = (await get('stats')) || {};
+    let online = stats.online || [];
+    const now = Date.now();
+    online.push({ time: now });
+    // Keep only last 5 min
+    online = online.filter(v => v.time > now - 5 * 60 * 1000);
+    stats.online = online;
+    await patchEdgeConfig('stats', stats);
+    res.json({ online: online.length });
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to update online users' });
+  }
+});
+
+// Get online user count
+app.get('/api/online', async (req, res) => {
+  try {
+    let stats = (await get('stats')) || {};
+    let online = stats.online || [];
+    const now = Date.now();
+    online = online.filter(v => v.time > now - 5 * 60 * 1000);
+    res.json({ online: online.length });
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to get online users' });
+  }
+});
+
+
 
 // --- Sitemap Endpoint ---
 app.get('/sitemap.xml', async (req, res) => {
@@ -50,44 +90,21 @@ app.get('/sitemap.xml', async (req, res) => {
   const pages = [
     '/', '/about', '/projects', '/blog'
   ];
-  // Get blog slugs from blogRoutes (simulate: load from JSON/db for now)
+  // Get blog slugs from Edge Config
   let blogSlugs = [];
   try {
-    const blogsPath = path.join(process.cwd(), 'backport', 'blogs.json');
-    if (fs.existsSync(blogsPath)) {
-      const blogs = JSON.parse(fs.readFileSync(blogsPath, 'utf8'));
-      blogSlugs = blogs.map(b => `/blog/${b.slug}`);
-    }
-  } catch (e) { /* ignore */ }
+    const blogs = (await get('blogs')) || [];
+    blogSlugs = blogs.map(b => `/blog/${b.slug || b.id}`);
+  } catch (e) { 
+    console.error('Error fetching blogs for sitemap:', e);
+  }
   const urls = [...pages, ...blogSlugs];
-  const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.map(u => `<url><loc>https://${req.headers.host}${u}</loc></url>`).join('\n')}\n</urlset>`;
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+${urls.map(u => `<url><loc>https://${req.headers.host}${u}</loc></url>`).join('\n')}
+</urlset>`;
   res.header('Content-Type', 'application/xml');
   res.send(xml);
-});
-
-// --- Visitor Counter Endpoint ---
-app.get('/api/visitors', (req, res) => {
-  res.json({ visitors: visitorCount });
-});
-
-// --- Online User Counter Endpoint ---
-app.get('/api/online', (req, res) => {
-  // Unique IPs in last 5 min
-  const fiveMinAgo = Date.now() - 5 * 60 * 1000;
-  const recent = recentVisitors.filter(v => v.time > fiveMinAgo);
-  const uniqueIPs = new Set(recent.map(v => v.ip));
-  res.json({ online: uniqueIPs.size });
-});
-
-// --- Gallery Endpoint (static Google Drive links) ---
-app.get('/api/gallery', (req, res) => {
-  // Replace with your own public Google Drive image links
-  const images = [
-    'https://drive.google.com/file/d/1nu2u7G8NDK382klluz3XSUMcRrbxxuX7/view?usp=share_link',
-    'https://drive.google.com/file/d/1fdKMEu47XZ1cqlVkAzOhcj5BNS4FDpvW/view?usp=share_link',
-    'https://drive.google.com/file/d/15k4gcZQ6p9GVEPR0YpdB-IGTztO0cIVK/view?usp=share_link'
-  ];
-  res.json({ images });
 });
 
 // --- CSRF Token Endpoint ---
